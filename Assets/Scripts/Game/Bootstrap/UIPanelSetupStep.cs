@@ -66,7 +66,9 @@ namespace Game.Bootstrap
                         panelSO.sceneTags,
                         panelSO.loadPolicy,
                         panelSO.priority,
-                        panelSO.isModal));
+                        panelSO.isModal,
+                        string.IsNullOrEmpty(panelSO.inputContextId) ? null : panelSO.inputContextId,
+                        panelSO.inputContextPriority));
 
                     registered++;
                 }

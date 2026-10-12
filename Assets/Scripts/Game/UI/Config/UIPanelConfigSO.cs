@@ -33,5 +33,11 @@ namespace Game.UI.Config
         [Tooltip("是否模态：弹窗栈会挡住其下层面板的点击（Toast 这类轻提示不要勾）")]
         public bool isModal;
 
+        [Tooltip("打开本面板时自动推入的输入上下文（留空 = 不参与）。本项目填 UI：打开即阻断玩法输入，最后一个声明该上下文的面板关闭时自动弹出。")]
+        public string inputContextId = "";
+
+        [Tooltip("自动推入输入上下文时的优先级（越大越优先；同上下文被多个面板声明时取最大值）")]
+        public int inputContextPriority;
+
     }
 }

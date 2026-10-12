@@ -386,6 +386,38 @@ if (def != null && def.HasTag("level")) { /* ... */ }
 判据（日志）：切换完成那行会列出当前已加载的场景，例如
 `切换完成：Level2（已加载场景：LoadingScene、Level2）`。
 
+### 2.11 新增一个输入动作（改 2 处，框架零改动）
+
+框架只提供**输入基础设施**（生命周期 / 上下文栈 / 查询 / 后端适配），**不含任何操作语义**（框架里没有 `Jump`/`Attack`）。
+
+1. **绑定资源**：在 `Assets/Scripts/Game/Inputs/GameInputActions.inputactions` 里给对应 ActionMap 加一个 Action
+   （与本项目一样把资产**标记为 Addressable**；地址见 `AttachInputActionsStep.Address`）。
+2. **加常量**：在 `Game.Inputs.GameActions` 里加 `public const string Xxx = "Xxx";`。
+
+读输入（玩法只依赖接口，**不要**直接读 `InputAction` / `Input.GetButton`）：
+
+```csharp
+var input = ServiceLocator.Get<IInputService>();
+if (input.WasPressedThisFrame(GameActions.Jump)) Jump();
+var move = input.GetVector2(GameActions.Move);
+input.ActionTriggered += e => Debug.Log($"{e.ActionId} {e.Phase} {e.Scalar}");   // 事件为辅
+```
+
+**上下文（UI 阻断玩法就是这个）**：有效上下文 = 优先级最高的那一批。
+
+```csharp
+input.PushContext(GameActions.Contexts.Gameplay, GameActions.Priorities.Gameplay);  // 进玩法
+input.PushContext(GameActions.Contexts.UI, GameActions.Priorities.UI);              // 开 UI → 玩法输入被阻断
+input.PopContext(GameActions.Contexts.UI);                                          // 关 UI → 自动恢复
+```
+
+- 空栈 = **不限制**（不用上下文的项目行为不变）；同名重复 Push 会**计数**，需等次数 Pop。
+- **UI 面板会自动阻断**：在面板配置里填 `inputContextId = UI`（本项目 `DemoPanel` 已填）→ 打开自动 Push、关闭/被场景销毁自动 Pop，玩法输入相应被阻断/恢复，**不用手写代码**。
+- 换后端：再写一个 `IGlobalServiceModule`，`Order > 10`，`registry.Register<IInputBackend>(new XxxBackend())` 即可（后注册者覆盖）。
+- 演示：`Game.Inputs.InputDemo`（**事件驱动，不依赖 Update**）。按 `Escape` 切入/切出 UI 上下文。
+
+完整设计、接口与实测记录见 [`INPUT_DESIGN.md`](./INPUT_DESIGN.md)。
+
 ## 3. 常用 API 速查
 
 | 想做的事 | API |
@@ -400,6 +432,7 @@ if (def != null && def.HasTag("level")) { /* ... */ }
 | 存储 | `IStorage.Save<T>()` / `Load<T>()` / `Delete()` / `Clear(prefix)` |
 | 日志 | 优先构造函数注入 `ILogger`；静态代码用 `Log.Info/Warn/Error`（需先 `Log.Init`） |
 | 加载步骤 | `ILoadStep` / `ILoadContext`（`ctx.Services`、`ctx.SceneName`、`ctx.Report`）；提供者 `IStartupLoadStepProvider` / `ISceneLoadStepProvider` |
+| 输入 | `IInputService.IsPressed/WasPressedThisFrame/GetAxis/GetVector2`、`PushContext/PopContext`、事件 `ActionTriggered` |
 | 引导参数 | `IBootstrapOptionsProvider.CreateOptions()` → `EntrySceneName` / `LoadingSceneName` / `ScanPrefixes` |
 
 > 命名冲突提醒：`Framework.Abstractions.Logging.ILogger` 与 `UnityEngine.ILogger` 同名，请用
@@ -427,11 +460,13 @@ Assets/Scripts/
 │   ├── Editor/                              # 编辑器工具（Game-Editor）：同步登记 + 场景下拉 + 校验按钮
 │   ├── Modules/DemoGlobalModule.cs          # 示例：全局 + 场景级服务
 │   ├── Modules/GameSceneServiceModule.cs    # 示例：把场景服务切为 Addressables 版
+│   ├── Inputs/                              # 输入：GameActions / GameInputModule / 输入资产 / 接入步骤 / InputDemo
 │   ├── Config/DemoTuningConfig.cs           # 示例：纯代码配置 + IConfigFactory
 │   └── UI/                                  # 面板（LoadingPanel / DemoPanel）+ UIConfigAsset
 ├── Fonts/              # 中文字体（方正小标宋简.TTF + 生成的 CNFont SDF.asset）
 ├── UI/Tools/           # LoadingDots / ProgressBar 小工具（命名空间 Game.UI.Tools）
-└── Tests/              # EditMode 测试（61 例）
+└── Tests/              # EditMode 测试（127 例）
+    └── PlayMode/       # PlayMode 测试（3 例，程序集 Tests.PlayMode）
 ```
 
 **依赖方向（不可逆）**：`Core` ← `Abstractions` ← `Adapters` ← `Bootstrap` ← `Game`。
@@ -466,6 +501,12 @@ Assets/Scripts/
 21. **切换后光照变了不一定是 bug**：`RenderSettings`（环境光/天空盒/雾）和 Light 都是**场景自带数据**，切过去就用目标场景的配置。请在两个场景里把灯光参数对齐（本工程的 `Level2` 是新建场景默认的 `intensity=1`/暖白，而 `SampleScene` 是 `2`/纯白）。框架只负责**过渡期不叠加**（日志：`关闭旧场景灯光：…`），不负责统一各场景的光照。
 22. 🔴 **Build Settings 与 Addressables 对场景是互斥的**：场景一旦标记为 Addressable，Unity 会**自动把它在 Build Settings 里禁用**（`enabled=false` + 控制台警告）。所以不要指望「两处都登记、两条路都能跑」—— 本工程走 Addressables（`AddressablesSceneService`），Build Settings 里 3 个场景全是 `enabled=false`。配置里用 `registration` 字段声明走哪条路，同步工具只会写一条。
 23. **场景配置是可选的**：没建 `SceneCatalog.asset` 时一切照旧（所有场景按「Additive / 不常驻 / 显示 Loading」处理）。想从旧行为迁移，就先把现有场景登记进去、再逐步加 `preloadAddresses` 等字段。
+24. **`GetAxis` 读 `Vector2` 动作会抛异常**（`Cannot read value of type 'Single' from composite ...`）—— 框架已在 `InputSystemBackend` 内部按 `activeValueType` 选通道修好。⚠️ 这个错误**只在 Play 下复现**：EditMode 里动作未绑设备时 `activeValueType` 为 `null`、读取直接返回 0，所以单测覆盖不到（已用「类型路由判据」单测兜底）。
+25. **模拟输入只能在 Play 下生效**：`InputSystem.QueueStateEvent` 需配合 `InputSystem.settings.updateMode = ProcessEventsManually` + `InputSystem.Update()` 才能在不依赖真实按键的情况下注入输入（原生后端会与模拟事件相互覆盖，导致设备态读回 0）。
+26. **`UnityEngine.ILogger` 与框架 `ILogger` 同名**：在同时 `using UnityEngine;` 的文件里要用别名 `using ILogger = Framework.Abstractions.Logging.ILogger;`（输入模块踩过一次）。
+27. **命名空间不要叫 `Game.Input`**：会与 `UnityEngine.Input` 在类型解析上打架；本项目用 `Game.Inputs`。
+28. **`GamepadButton` 是顺序枚举不是位标志**（`South == 6`）→ 造合成手柄状态必须用 `GamepadState.WithButton(...)`；直接写 `buttons = (ushort)GamepadButton.South` 会按错键（我在 PlayMode 测试里就这么错过一次）。对比 `MouseState.buttons` 才是位域（`1` = 左键）。
+29. **手写/模拟输入要在 Play 下才有效**：需 `InputSystem.settings.updateMode = ProcessEventsManually` + `QueueStateEvent` + `InputSystem.Update()`；默认动态更新模式下模拟事件不会作用到 `ReadValue`。合成手柄比键盘可靠。
 
 ---
 
@@ -473,5 +514,6 @@ Assets/Scripts/
 
 - **完整工程文档**（架构、文件地图、问题清单、进度、命名约定）：[`PROJECT_GUIDE.md`](./PROJECT_GUIDE.md)
 - **场景配置化设计与实施记录**：[`SCENE_CONFIG_DESIGN.md`](./SCENE_CONFIG_DESIGN.md)
-- **跑测试**：Test Runner → **EditMode**（共 61 例：容器 18 / UIService 12 / SceneFlow 16 / SceneCatalog 5 / SceneConfig 9 / 示例 1）
+- **输入服务设计与实测记录**：[`INPUT_DESIGN.md`](./INPUT_DESIGN.md)
+- **跑测试**：Test Runner → **EditMode 127 例**（全绿）+ **PlayMode 3 例**（`Tests.PlayMode`，输入后端的真实回归；含那个只能在 Play 复现的 `activeValueType` bug）
 - **接入成本实测**：见 `PROJECT_GUIDE.md` §12（新增服务 / 面板 / 配置三条路径的实测记录）

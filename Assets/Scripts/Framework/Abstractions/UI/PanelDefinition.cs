@@ -58,7 +58,20 @@ namespace Framework.Abstractions.UI
         /// </summary>
         public bool IsModal;
 
-        public PanelDefinition(Type panelType,string prefabAddress,PanelLayer layer,bool cacheOnClose,List<string> sceneTags,LoadPolicy loadPolicy = LoadPolicy.OnDemand, int priority = 0, bool isModal = false)
+        /// <summary>
+        /// 该面板打开时自动推入的**输入上下文**；为空表示不参与自动切换（默认）。
+        /// <para>
+        /// 语义完全由项目层决定（框架不解释其含义）：本项目填 <c>"UI"</c>，
+        /// 打开即阻断玩法输入，最后一个声明该上下文的面板关闭时自动弹出。
+        /// </para>
+        /// <para>多个面板声明同一上下文时，只有「第一个打开 / 最后一个关闭」才会真正 Push / Pop。</para>
+        /// </summary>
+        public string InputContextId;
+
+        /// <summary>自动推入输入上下文时的优先级（越大越优先；同 id 被多个面板声明时取最大值）。</summary>
+        public int InputContextPriority;
+
+        public PanelDefinition(Type panelType,string prefabAddress,PanelLayer layer,bool cacheOnClose,List<string> sceneTags,LoadPolicy loadPolicy = LoadPolicy.OnDemand, int priority = 0, bool isModal = false, string inputContextId = null, int inputContextPriority = 0)
         {
             PanelType = panelType;
             PrefabAddress = prefabAddress;
@@ -68,6 +81,8 @@ namespace Framework.Abstractions.UI
             this.loadPolicy = loadPolicy;
             Priority = priority;
             IsModal = isModal;
+            InputContextId = inputContextId;
+            InputContextPriority = inputContextPriority;
         }
     }
 }

@@ -2,7 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Framework.Abstractions;
 using Framework.Abstractions.Events;
+using Framework.Abstractions.Input;
 using Framework.Abstractions.Logging;
 using Framework.Abstractions.Scenes;
 using Framework.Abstractions.UI;
@@ -141,6 +143,131 @@ public class UIServiceTests
     {
         var svc = new UIService(new FakeFactory(), null, null);
         Assert.DoesNotThrow(() => svc.Register(null));
+    }
+
+    // ---------------- 输入上下文自动 Push/Pop ----------------
+
+    /// <summary>记录 Push/Pop 的 IInputService 替身（不需要触发事件，故用空访问器避开 CS0067）。</summary>
+    private sealed class RecordingInputService : IInputService
+    {
+        public readonly List<string> Pushed = new List<string>();
+        public readonly List<string> Popped = new List<string>();
+        public readonly List<InputContext> Active = new List<InputContext>();
+
+        public IReadOnlyList<InputContext> ActiveContexts => Active;
+
+        public event Action<InputActionEvent> ActionTriggered { add { } remove { } }
+
+        public void PushContext(string contextId, int priority = 0)
+        {
+            Pushed.Add($"{contextId}:{priority}");
+            Active.Add(new InputContext(contextId, priority));
+        }
+
+        public void PopContext(string contextId)
+        {
+            Popped.Add(contextId);
+            Active.RemoveAll(c => c.ContextId == contextId);
+        }
+
+        public bool IsContextActive(string contextId) => Active.Exists(c => c.ContextId == contextId);
+
+        public bool IsPressed(string actionId, int playerId = 0) => false;
+        public bool WasPressedThisFrame(string actionId, int playerId = 0) => false;
+        public bool WasReleasedThisFrame(string actionId, int playerId = 0) => false;
+        public float GetAxis(string actionId, int playerId = 0) => 0f;
+        public Vector2 GetVector2(string actionId, int playerId = 0) => default;
+        public void Dispose() { }
+    }
+
+    private static PanelDefinition InputDef(string contextId, int priority = 0)
+        => new PanelDefinition(typeof(TestPanel), "addr", PanelLayer.Normal, true, null,
+                               LoadPolicy.OnDemand, 0, false, contextId, priority);
+
+    [Test]
+    public void Open_WithInputContext_PushesOnOpen_PopsOnClose()
+    {
+        var input = new RecordingInputService();
+        var svc = new UIService(new FakeFactory(), null, null, null, null, input);
+        svc.Register(InputDef("UI", 100));
+
+        svc.Open<ITestPanel>();
+
+        CollectionAssert.AreEqual(new[] { "UI:100" }, input.Pushed);
+        Assert.IsTrue(input.IsContextActive("UI"));
+
+        svc.Close<ITestPanel>();
+
+        CollectionAssert.AreEqual(new[] { "UI" }, input.Popped);
+        Assert.IsFalse(input.IsContextActive("UI"));
+    }
+
+    [Test]
+    public void Open_WithoutInputContext_DoesNotTouchInput()
+    {
+        var input = new RecordingInputService();
+        var svc = new UIService(new FakeFactory(), null, null, null, null, input);
+        svc.Register(Def());
+
+        svc.Open<ITestPanel>();
+        svc.Close<ITestPanel>();
+
+        Assert.AreEqual(0, input.Pushed.Count);
+        Assert.AreEqual(0, input.Popped.Count);
+    }
+
+    [Test]
+    public void Open_SamePanelTwice_PushesOnlyOnce()
+    {
+        var input = new RecordingInputService();
+        var svc = new UIService(new FakeFactory(), null, null, null, null, input);
+        svc.Register(InputDef("UI", 100));
+
+        svc.Open<ITestPanel>();
+        svc.Open<ITestPanel>();   // 复用缓存实例
+
+        Assert.AreEqual(1, input.Pushed.Count, "重复打开不应重复 Push");
+    }
+
+    [Test]
+    public void CloseAll_PopsInputContexts()
+    {
+        var input = new RecordingInputService();
+        var svc = new UIService(new FakeFactory(), null, null, null, null, input);
+        svc.Register(InputDef("UI", 100));
+
+        svc.Open<ITestPanel>();
+        svc.CloseAll();
+
+        Assert.AreEqual(0, input.Active.Count);
+        Assert.AreEqual(1, input.Popped.Count);
+    }
+
+    [Test]
+    public void DisposeScenePanels_PopsInputContextOfDestroyedPanel()
+    {
+        var input = new RecordingInputService();
+        var svc = new UIService(new FakeFactory(), null, null, null, null, input);
+        svc.Register(new PanelDefinition(typeof(TestPanel), "addr", PanelLayer.Normal, true,
+                                        new List<string> { "SampleScene" },
+                                        LoadPolicy.OnDemand, 0, false, "UI", 100));
+
+        svc.Open<ITestPanel>();
+        Assert.IsTrue(input.IsContextActive("UI"));
+
+        svc.DisposeScenePanels("Level2");   // 进入别的场景 → 面板被销毁 → 上下文应被自动弹掉
+
+        Assert.IsFalse(input.IsContextActive("UI"), "面板被销毁时不应把输入上下文泄漏在栈上");
+    }
+
+    [Test]
+    public void Open_WithNoInputService_DoesNotThrow()
+    {
+        var svc = new UIService(new FakeFactory(), null, null);
+        svc.Register(InputDef("UI", 100));
+
+        Assert.DoesNotThrow(() => svc.Open<ITestPanel>());
+        Assert.DoesNotThrow(() => svc.Close<ITestPanel>());
     }
 
     // ---------------- 场景标签校验（SceneTags）----------------

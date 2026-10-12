@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Framework.Abstractions.Assets;
 using Framework.Abstractions.Events;
+using Framework.Abstractions.Input;
 using Framework.Abstractions.Logging;
 using Framework.Abstractions.Scenes;
 using Framework.Abstractions.UI;
@@ -21,14 +22,22 @@ namespace Framework.UI
         private readonly ISceneService _sceneService;
         private readonly bool _enforceSceneTags;
 
+        /// <summary>可选：用于「面板打开/关闭时自动推/弹输入上下文」。为空则本能力整体关闭。</summary>
+        private readonly IInputService _input;
+
+        /// <summary>当前已由 UI 自动推入的输入上下文（用于自愈式对齐，不会泄漏）。</summary>
+        private readonly HashSet<string> _pushedInputContexts = new();
+
         public UIService(IPanelFactory factory,IEventBus eventBus, ILogger logger,
-                         ISceneService sceneService = null, UISettings settings = null)
+                         ISceneService sceneService = null, UISettings settings = null,
+                         IInputService inputService = null)
         {
             _factory = factory;
             _eventBus = eventBus;
             _logger = logger;
             _sceneService = sceneService;
             _enforceSceneTags = settings?.EnforceSceneTags ?? true;
+            _input = inputService;
         }
 
         public void Register(PanelDefinition definition)
@@ -109,6 +118,8 @@ namespace Framework.UI
                 _factory.Destroy(panel as IUIPanel);
                 _instances.Remove(definition.PanelType);
             }
+
+            SyncInputContexts();
         }
 
         public void CloseAll()
@@ -127,6 +138,8 @@ namespace Framework.UI
                 }
             }
             _openOrder.Clear();
+
+            SyncInputContexts();
         }
 
         public IReadOnlyList<PanelDefinition> GetDefinitions() => new List<PanelDefinition>(_definitions.Values);
@@ -175,6 +188,8 @@ namespace Framework.UI
 
             foreach (var t in toRemove) _instances.Remove(t);
             _openOrder.RemoveAll(p => !_instances.ContainsKey(p.GetType()));
+
+            SyncInputContexts();
         }
 
         /// <summary>
@@ -250,6 +265,65 @@ namespace Framework.UI
             if (!_openOrder.Contains(lifecycle)) _openOrder.Add(lifecycle);
             ApplyOrder(lifecycle, definition);
             lifecycle.Show();
+
+            SyncInputContexts();
+        }
+
+        /// <summary>
+        /// 把「UI 自动推入的输入上下文」对齐到当前**已打开**面板集合（打开/关闭/销毁后都调）。
+        /// <para>
+        /// 采用「按现状推导」而非「计数器增减」：即使某条路径漏调，下一次对齐也会自愈，
+        /// 不会出现「上下文被永久推着、玩法输入再也不响应」的泄漏。
+        /// </para>
+        /// <para>面板声明 <see cref="PanelDefinition.InputContextId"/> 即参与；同 id 多面板时只在 0→1 / 1→0 时真正 Push / Pop。</para>
+        /// </summary>
+        private void SyncInputContexts()
+        {
+            if (_input == null) return;
+
+            // 1) 期望集合：已打开面板声明的输入上下文（同 id 取最大优先级）
+            Dictionary<string, int> desired = null;
+            for (int i = 0; i < _openOrder.Count; i++)
+            {
+                var panel = _openOrder[i];
+                if (panel == null) continue;
+                if (!_definitions.TryGetValue(panel.GetType(), out var def) || def == null) continue;
+                if (string.IsNullOrEmpty(def.InputContextId)) continue;
+
+                if (desired == null) desired = new Dictionary<string, int>();
+
+                if (desired.TryGetValue(def.InputContextId, out var existing))
+                    desired[def.InputContextId] = Math.Max(existing, def.InputContextPriority);
+                else
+                    desired[def.InputContextId] = def.InputContextPriority;
+            }
+
+            // 2) 撤掉不再需要的（先撤后推，保证不会瞬时存在两个同优先级上下文）
+            if (_pushedInputContexts.Count > 0)
+            {
+                List<string> stale = null;
+                foreach (var id in _pushedInputContexts)
+                {
+                    if (desired != null && desired.ContainsKey(id)) continue;
+                    if (stale == null) stale = new List<string>();
+                    stale.Add(id);
+                }
+                if (stale != null)
+                    foreach (var id in stale)
+                    {
+                        _pushedInputContexts.Remove(id);
+                        _input.PopContext(id);
+                    }
+            }
+
+            // 3) 推上新增的
+            if (desired == null) return;
+            foreach (var kv in desired)
+            {
+                if (_pushedInputContexts.Contains(kv.Key)) continue;
+                _pushedInputContexts.Add(kv.Key);
+                _input.PushContext(kv.Key, kv.Value);
+            }
         }
 
         /// <summary>

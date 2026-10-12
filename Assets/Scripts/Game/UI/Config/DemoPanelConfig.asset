@@ -21,3 +21,5 @@ MonoBehaviour:
   loadPolicy: 0
   priority: 0
   isModal: 0
+  inputContextId: UI
+  inputContextPriority: 100
