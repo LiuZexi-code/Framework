@@ -325,6 +325,10 @@ public sealed class GameSceneServiceModule : IGlobalServiceModule
 services.Register(new UISettings { EnforceSceneTags = false });
 ```
 
+> **弹窗栈**（`IPopupService`）的相关开关也在 `UISettings` 上：`PopupQueueTimeoutSeconds`
+> —— `PushAsync` 队列中「单项打开」的超时（默认 10s，`<=0` 关闭），避免一次卡住的加载堵死整条队列。
+> 取消是隐式的：`Pop` / `PopAll` / 场景切换会作废所有待处理项（被取消的项不显示、不入栈，以 `null` 完成）。
+
 同一个 `sceneTags` 还会和 `loadPolicy` 配合，决定**进入场景前要不要预加载**那个面板：
 
 ```text

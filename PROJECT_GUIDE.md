@@ -421,6 +421,11 @@ sequenceDiagram
 - **排序**：面板 order = `UILayerOrder.ForPanel(Layer, Priority)` = `层基址 + 1 + Clamp(Priority)`，写到**面板自己的** Canvas（`PanelSortTarget`，`overrideSorting=true` + 自带 `GraphicRaycaster`）；同 order 时靠兄弟顺序做「后开的在上」。
   - ⚠️ **嵌套 Canvas 两条静默失效规则**（都实测过）：先写 `overrideSorting` 再写 `sortingOrder`；且**必须先挂到最终父级再配置**（`SetParent` 会重置 `overrideSorting`）。已收口到 `NestedCanvas`。
 - `IPopupService`/`PopupService`（`Framework.UI`）：全局单栈（`Push/Pop/PopAll/PopTo/Peek/Depth/CanPop/Clear` + `Pushed/Popped`）；重复 Push 同一面板 = 提到栈顶；模态面板由共享 `PopupBlocker`（order = `modal.order - 1`，全透明但吃点击）挡住其下层。设计稿 `UI_POPUP_DESIGN.md`。
+  - **异步队列**：`PushAsync` 串行执行（调用顺序 = 栈顺序）；已缓存面板走**快路径**在调用帧内同步完成（所以能用同步 `[Test]` 断言 `task.IsCompleted`）。
+  - **取消是隐式的**：`Pop` / `PopAll` / `Clear` / `PopTo` / 场景卸载 / `Dispose` 会作废所有待处理项。队列中的项**当场**出队并以 `null` 完成；正在打开的那一项只打标记，等打开落地后**不入栈**（面板已建出来则 `Close()` 掉）。
+  - **超时兑底**：`UISettings.PopupQueueTimeoutSeconds`（默认 10s，`<= 0` 关闭）——单项超时则记错误 + 跳过，避免一次卡住的加载堵死整条队列；超时后“迟到但成功”的面板会被建出来再 `Close()` 掉。
+  - 诊断：`IPopupService.PendingCount`（队列中 + 正在打开的那一项；仅统计异步 Push）。
+- `UISettings`：`ReferenceResolution` / `MatchWidthOrHeight` / `EnforceSceneTags` / `PopupQueueTimeoutSeconds`。
 - **面板场景标签校验（2026-10-12）**：`UISettings.EnforceSceneTags`（默认 `true`）控制 `UIService.CheckSceneTag(PanelDefinition)` 的行为 —— 判据：定义无标签（= 全局）→ 放行；当前无活动场景 → 放行；`SceneTags` 包含当前活动场景名 → 放行；否则记**警告**，且 `EnforceSceneTags=true` 时**拒绝打开**（`Open`/`OpenAsync` 直接返回 null），`false` 时仅告警仍照常打开。
   - ⚠️ **该校验不作用于 `PreloadAsync`**：预加载发生在切换过程中，此时 ActiveScene 还是**旧场景**，按标签判定会误拒。预加载的场景筛选由 `PreloadPanelsStep` 用 `ILoadContext.SceneName`（目标场景）负责 —— 两者职责不同，不要合并。
 - **同一个 `sceneTags` 一行决定三件事**（打开校验 + 预加载筛选 + 销毁判定），因此误填的代价是「打不开 + 被销毁」。
@@ -605,8 +610,9 @@ sequenceDiagram
   3. 放在 `Game` 程序集即可 —— 启动时自动注册，**无需改框架**（示例：`Game/Modules/DemoGlobalModule.cs`）。
   说明：容器已支持**构造函数注入**，`registry.Register<IFoo,Foo>()` 可直接用（依赖自动解析）；仅在需要自定义构造逻辑时才用 `RegisterFactory<IX>(...)`。
 - **新增场景级服务**：实现 `ISceneServiceModule.RegisterScene(registry, sceneName)`，每个场景建容器时自动注册（同见 `DemoGlobalModule`）。
-- **跑单元测试**：Test Runner → EditMode（共 **89 例**：`ServiceCollectionTests` 18 / `UIServiceTests` 15 / `SceneFlowTests` 24 / `SceneCatalogTests` 5 / `SceneConfigTests` 10 / `UILayerOrderTests` 6 / `PopupServiceTests` 11），或 MCP `run_tests`。
+- **跑单元测试**：Test Runner → EditMode（共 **95 例**：`ServiceCollectionTests` 18 / `UIServiceTests` 15 / `SceneFlowTests` 24 / `SceneCatalogTests` 5 / `SceneConfigTests` 10 / `UILayerOrderTests` 6 / `PopupServiceTests` 17），或 MCP `run_tests`。
   - ⚠️ 跑过 Play 之后再跑测试，若出现「Unhandled log message」类失败，多半是 `Log` 静态门面残留了 `UnityLogger`（已由 `Tests/TestSuiteSetup.cs` 的 `[SetUpFixture]` 复位）。
+  - ⚠️ 本项目 UTF **不支持 `async Task` 测试方法**；需「等待中被打断 / 超时后完成」的用例用 **`[UnityTest] IEnumerator` + `yield return null`**（EditMode 下能驱动 await 延续），**绝不用** `.Wait()/.Result/WaitAll`（会卡死编辑器）。示例见 `PopupServiceTests` 的 `GatedFactory` 系列。
 - **新增 UI 面板**：
   1. 建预制体，挂实现 `IUIPanelLifecycle`（推荐继承 `UIPanelBase`）的脚本，加 `[UIPanel("key")]`；
   2. 把预制体加入 Addressables 并记地址；

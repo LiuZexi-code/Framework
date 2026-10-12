@@ -159,10 +159,38 @@ SurvivesScene(definition, entering) = definition == null            // 定义缺
   `SceneFlowTests.SceneResourceRelease_DisposesLeavingScenePanels_ButKeepsGlobalAndEnteringScenePanels`（钩子层）。
 - 顺带清理：删游离资产 `Game/UIPanelConfig.asset`（未被 `UIConfigAsset` 引用）；`LoadingPanelConfig.sceneTags` 清空（原为 `isGlobal=1` + `sceneTags=[LoadingScene]`，标签是死配置）。
 
-### 5.4 串行队列（⑥b）
-- `PushAsync` 入队；一次只处理一个；`TaskCompletionSource` 回传。
-- **可取消**：队列项带 `Cancelled` 标记；`Pop`/`Clear`/场景切换会把待处理项标记取消（取消后**不显示**、不 `Show`）。
-- **超时兜底**：单项超过 `PopupSettings.QueueTimeoutSeconds`（默认 10s）→ 记错误 + 跳过，避免整条队列卡死。
+### 5.4 串行队列（⑥b）—— 已实现
+
+**结构**：显式 `Queue<PendingPush>` + `async` 泵 `DrainQueueAsync()`，一次只处理一项 → 「调用顺序 = 栈顺序」。
+每项带一个 `TaskCompletionSource`（⚠️ **不加** `RunContinuationsAsynchronously`：调用方的延续要回到 Unity 主线程）。
+
+**快路径（关键性质）**：底层 `OpenAsync` 已同步完成时**直接 return、不建计时器**；
+又因为串联用的是 `await`（**不是** `ContinueWith`－后者会排到线程池），所以「已缓存面板」的 `PushAsync` 在**调用帧内同步完成**。
+Unity 与测试都依赖这条性质（测试断言 `task.IsCompleted` 而不阻塞主线程）。
+
+**取消（隐式）**：
+
+| 项的状态 | 行为 |
+|---|---|
+| 还在队列中 | **当场**摘出队列，`Task` 立刻以 `null` 完成 |
+| 正在打开中 | 只打 `Cancelled` 标记，等它的打开落地（或被超时截断）后才能决定是否要关掉刚建出来的面板 |
+
+- 触发点：`Pop` / `PopAll` / `Clear` / `PopTo` / 场景卸载 / `Dispose`（`Dispose` 额外直接终结飞行项，否则调用方会永远等不到结果）。
+- 已取消的项：**不显示、不入栈**；若面板已被建出来则 `Close()` 掉；失败/取消/超时**统一以 `null` 完成**（不抛异常）。
+- 设计取舍：`Pop` 同时也作废待处理项 —— 语义是「按了返回/关闭，就不该再冒出此前排队要开的弹窗」。
+
+**超时兜底**：`UISettings.PopupQueueTimeoutSeconds`（默认 **10s**，`<= 0` 关闭）。
+用 `await Task.WhenAny(openTask, Task.Delay(timeout))`；超时则记错误、跳过并继续下一项（避免一个卡住的加载把**整条队列**堵死）。
+超时后那次打开**最终仍可能成功** —— 那时 `UIService` 已经把它创建并 `Show()` 了出来（但不在弹窗栈里，会是一个「无主的可见面板」），
+所以额外挂一个 `AbandonLateOpenAsync` 等它落地后 `Close()` 掉（延续必须回到主线程，所以用 `await`）。
+
+**新增查询**：`IPopupService.PendingCount` = 队列中 + 正在打开的那一项（仅统计 **异步** Push；同步 `Push` 不占队列）。
+
+**测试写法约束（踩过坑）**：本项目 UTF **不支持 `async Task` 测试方法**（报 `Method has non-void return value`），
+也不能用 `.Wait()/.Result/WaitAll` 阻塞主线程（会死锁卡死编辑器）。
+但 EditMode 的 **`[UnityTest] IEnumerator` 能驱动 await 延续**（实测 `SyncContext = UnitySynchronizationContext`），
+所以这类需要「等待中被打断 / 超时后完成」的用例用 `[UnityTest]` + `yield return null` 写。
+配套用了 `GatedFactory`（可人为卡住某个面板的 `CreateAsync`，再 `Release` 放行）。
 
 ---
 
@@ -215,7 +243,8 @@ Play 验收：两个 Popup 叠加 + 一个 Toast；验证点击命中（嵌套 C
 | 阶段 | 范围 | 验收 | 状态 |
 |---|---|---|---|
 | **1 基础 + 排序原语** | `UIRootCreator` 补 `overrideSorting`；`PanelDefinition.Priority/IsModal`；`PanelFactory` 挂排序句柄（`Canvas(overrideSorting)` + `GraphicRaycaster`）；`UIService` 打开时应用排序（降级安全）；配置 SO 接线 | 现有 12 例全绿 + 排序新例；Play 视觉不回归 | ✅ 76 例绿 + Play 验证 |
-| **2 栈 + 模态 + 队列** | `IPopupService`/`PopupService`、全局栈、共享 blocker、`(Priority, 打开序)`、异步串行队列、场景联动 | `PopupServiceTests` 全绿 + Play 双向验证 | ✅ 87 例绿 + Play 验证（遮罩/排序/点击命中）；**「可取消 + 超时」未做** |
+| **2 栈 + 模态 + 队列** | `IPopupService`/`PopupService`、全局栈、共享 blocker、`(Priority, 打开序)`、异步串行队列、场景联动 | `PopupServiceTests` 全绿 + Play 双向验证 | ✅ 87 例绿 + Play 验证（遮罩/排序/点击命中） |
+| **2b 队列取消 + 超时** | `PendingCount`；队列项取消（排队当场出队 / 飞行项打标）；`UISettings.PopupQueueTimeoutSeconds` 超时兑底 + 迟到面板回收；`[UnityTest]` 异步用例 | 全量测试 | ✅ 95 例绿（PopupServiceTests 17 例，其中 4 例为 `[UnityTest]`） |
 | **3 收尾** | `SceneTags` 阶段 B（删 `IsGlobal` 字段）、删游离资产 `Game/UIPanelConfig.asset`、清 `LoadingPanelConfig.sceneTags`、`DisposeScenePanels(enteringScene)` 修「预加载面板被误删」、文档 | 全量测试 + 文档 | ✅ 89 例绿；`SceneResourceRelease` 签名已加 `enteringScene` |
 
 ---
@@ -228,4 +257,6 @@ Play 验收：两个 Popup 叠加 + 一个 Toast；验证点击命中（嵌套 C
    阶段 B 已把「无标签 = 全局」定为唯一真相（删掉了会打架的 `isGlobal` 字段）；
    编辑器侧目前**只能靠 `UIPanelConfigSO.sceneTags` 的 Tooltip 提示**，没有硬校验 —— 若以后误配变多，可加重合/拼写校验。
 4. **`Priority` 与 `PanelLayer` 的关系**：**层优先**，`Priority` 只在层内生效；要跨层必须靠 §3 的排序空间（已支持）。
-5. **异步队列的取消/超时未实现**（阶段 2 遗留）：当前 `PushAsync` 只保证「调用顺序 = 栈顺序」，入队后无法取消；`Pop`/`PopAll`/场景切换不会作废待处理项。已在 `PopupService` 类注释中标注。
+5. ~~**异步队列的取消/超时未实现**~~：**已完成（见 §5.4）**。
+   唯一保留的取舍：超时后「迟到但成功」的面板会被建出来再 `Close()` 掉（而不是事前阻止）——
+   因为 `UIService.OpenAsync` 内部先创建后返回，无法从中途取消；代价是一个多余的隐藏实例，无泄漏。

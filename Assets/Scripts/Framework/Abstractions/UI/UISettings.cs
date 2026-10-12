@@ -19,5 +19,10 @@ namespace Framework.Abstractions.UI
         /// 当前场景不匹配时**拒绝打开**；设为 false 则只记警告仍然打开。
         /// </summary>
         public bool EnforceSceneTags = true;
-    }
+        /// <summary>
+        /// <see cref="IPopupService.PushAsync{T}"/> 队列中「单项打开」的超时秒数：
+        /// 超过就记错误并跳过该项，避免一次卡住的加载把**整条队列**堵死。
+        /// <para>&lt;= 0 表示不设超时。默认 10 秒。</para>
+        /// </summary>
+        public float PopupQueueTimeoutSeconds = 10f;    }
 }
