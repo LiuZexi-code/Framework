@@ -85,6 +85,12 @@ namespace Framework.UI
             if (parent != null) go.transform.SetParent(parent, false);
             go.name = prefab.name;
 
+            // 面板自带 Canvas + overrideSorting：排序与父级 Transform 顺序解耦（可跨层）。
+            // 排序句柄（PanelSortTarget）挂在**实例根**，UIService 用它无歧义地定位面板自己的 Canvas。
+            var sortTarget = go.GetComponent<PanelSortTarget>();
+            if (sortTarget == null) sortTarget = go.AddComponent<PanelSortTarget>();
+            sortTarget.Ensure(UILayerOrder.ForPanel(definition.Layer, definition.Priority));
+
             // 面板脚本可能挂在根节点或其子节点上
             var panel = go.GetComponent<IUIPanel>() ?? go.GetComponentInChildren<IUIPanel>(true);
             if (panel == null)

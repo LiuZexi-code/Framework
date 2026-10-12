@@ -35,7 +35,19 @@ namespace Framework.Abstractions.UI
         /// </summary>
         public List<string> SceneTags;
 
-        public PanelDefinition(Type panelType,string prefabAddress,PanelLayer layer,bool cacheOnClose,bool isGlobal,List<string> sceneTags,LoadPolicy loadPolicy = LoadPolicy.OnDemand)
+        /// <summary>
+        /// 层内优先级（越大越靠上）。**只在同一 <see cref="Layer"/> 内生效**；
+        /// 相同优先级时由「打开顺序」决定（后开的在上）。映射见 <see cref="UILayerOrder"/>。
+        /// </summary>
+        public int Priority;
+
+        /// <summary>
+        /// 是否模态：为 true 时，弹窗栈会把它「下面的」弹窗挡住点击（由弹窗服务放置共享遮罩）。
+        /// 默认 false —— 像 Toast 这类轻提示天生不该阻断交互。
+        /// </summary>
+        public bool IsModal;
+
+        public PanelDefinition(Type panelType,string prefabAddress,PanelLayer layer,bool cacheOnClose,bool isGlobal,List<string> sceneTags,LoadPolicy loadPolicy = LoadPolicy.OnDemand, int priority = 0, bool isModal = false)
         {
             PanelType = panelType;
             PrefabAddress = prefabAddress;
@@ -44,6 +56,8 @@ namespace Framework.Abstractions.UI
             IsGlobal = isGlobal;
             SceneTags = sceneTags;
             this.loadPolicy = loadPolicy;
+            Priority = priority;
+            IsModal = isModal;
         }
     }
 }

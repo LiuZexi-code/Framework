@@ -17,6 +17,13 @@ namespace Framework.Abstractions.UI
         Task<T> OpenAsync<T>() where T : class, IUIPanel;
         Task PreloadAsync<T>() where T : class, IUIPanel;
 
+        // 非泛型版：供「按运行时类型驱动」的代码使用（如弹窗栈 IPopupService）
+        IUIPanel Open(Type panelType);
+        Task<IUIPanel> OpenAsync(Type panelType);
+        void Close(Type panelType);
+        bool IsOpen(Type panelType);
+        bool IsCached(Type panelType);
+
         /// <summary>按面板类型预加载（非泛型版，供按策略/配置驱动的代码使用）。</summary>
         Task PreloadAsync(Type panelType);
 

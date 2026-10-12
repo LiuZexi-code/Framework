@@ -20,12 +20,12 @@ namespace Framework.UI
 
             GameObject root = CreateCanvas(parent, "UIRoot", 0, settings);
 
-            var background    = CreateCanvas(root.transform, "Canvas_Background", -100, settings);
-            var normal        = CreateCanvas(root.transform, "Canvas_Normal", 0, settings);
-            var highFrequency = CreateCanvas(root.transform, "Canvas_HighFrequency", 100, settings);
-            var popup         = CreateCanvas(root.transform, "Canvas_Popup", 200, settings);
-            var toast         = CreateCanvas(root.transform, "Canvas_Toast", 300, settings);
-            var overlay       = CreateCanvas(root.transform, "Canvas_Overlay", 400, settings);
+            var background    = CreateCanvas(root.transform, "Canvas_Background",    UILayerOrder.BaseOf(PanelLayer.Background), settings);
+            var normal        = CreateCanvas(root.transform, "Canvas_Normal",        UILayerOrder.BaseOf(PanelLayer.Normal), settings);
+            var highFrequency = CreateCanvas(root.transform, "Canvas_HighFrequency", UILayerOrder.BaseOf(PanelLayer.HighFrequency), settings);
+            var popup         = CreateCanvas(root.transform, "Canvas_Popup",         UILayerOrder.BaseOf(PanelLayer.Popup), settings);
+            var toast         = CreateCanvas(root.transform, "Canvas_Toast",         UILayerOrder.BaseOf(PanelLayer.Toast), settings);
+            var overlay       = CreateCanvas(root.transform, "Canvas_Overlay",       UILayerOrder.BaseOf(PanelLayer.Overlay), settings);
 
             uIRoot = root.AddComponent<UIRoot>();
             uIRoot.BindLayers(background.transform, normal.transform, highFrequency.transform,
@@ -81,11 +81,9 @@ namespace Framework.UI
         private static GameObject CreateCanvas(Transform parent, string name, int sortingOrder, UISettings settings)
         {
             GameObject go = new GameObject(name, typeof(RectTransform));
-            if(parent != null) go.transform.SetParent(parent, false);
 
-            Canvas canvas = go.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = sortingOrder;
+            // ⚠ 挂父级 + 配排序必须成对、且父级在先（顺序写反会被静默重置，见 NestedCanvas）
+            NestedCanvas.Configure(go, parent, sortingOrder);
 
             CanvasScaler scaler = go.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;

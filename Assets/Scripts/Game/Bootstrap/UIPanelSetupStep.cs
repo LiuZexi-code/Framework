@@ -65,7 +65,9 @@ namespace Game.Bootstrap
                         panelSO.cacheOnClose,
                         panelSO.isGlobal,
                         panelSO.sceneTags,
-                        panelSO.loadPolicy));
+                        panelSO.loadPolicy,
+                        panelSO.priority,
+                        panelSO.isModal));
 
                     registered++;
                 }

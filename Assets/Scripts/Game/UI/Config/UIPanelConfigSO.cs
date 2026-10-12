@@ -28,5 +28,11 @@ namespace Game.UI.Config
         [Tooltip("加载策略")]
         public LoadPolicy loadPolicy;
 
+        [Tooltip("层内优先级（越大越靠上；只在同 Layer 内生效；同优先级时后开的在上）")]
+        public int priority;
+
+        [Tooltip("是否模态：弹窗栈会挡住其下层面板的点击（Toast 这类轻提示不要勾）")]
+        public bool isModal;
+
     }
 }

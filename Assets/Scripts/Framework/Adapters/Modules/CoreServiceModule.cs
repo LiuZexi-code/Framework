@@ -39,6 +39,7 @@ namespace Framework.Adapters.Modules
             registry.Register(new UISettings());   // UI 缩放默认值，业务可在启动时按配置覆盖
             registry.Register<IPanelFactory, PanelFactory>();
             registry.Register<IUIService, UIService>();
+            registry.Register<IPopupService, PopupService>();   // 弹窗栈（全局单栈 + 模态链 + 层内优先级）
         }
     }
 }

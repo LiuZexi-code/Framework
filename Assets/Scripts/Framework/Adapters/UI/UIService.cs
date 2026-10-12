@@ -67,7 +67,11 @@ namespace Framework.UI
 
         public T Open<T>() where T : class, IUIPanel => (T)OpenCore(typeof(T));
 
+        public IUIPanel Open(Type panelType) => OpenCore(panelType);
+
         public async Task<T> OpenAsync<T>() where T : class, IUIPanel => (T)await OpenAsyncCore(typeof(T));
+
+        public Task<IUIPanel> OpenAsync(Type panelType) => OpenAsyncCore(panelType);
 
         public Task PreloadAsync<T>() where T : class, IUIPanel => PreloadAsync(typeof(T));
 
@@ -86,9 +90,13 @@ namespace Framework.UI
             _instances[definition.PanelType] = lifecycle;
         }
 
-        public void Close<T>() where T : class, IUIPanel
+        public void Close<T>() where T : class, IUIPanel => CloseCore(typeof(T));
+
+        public void Close(Type panelType) => CloseCore(panelType);
+
+        private void CloseCore(Type requested)
         {
-            if (!TryGetDefinition(typeof(T), out var definition)) return;
+            if (!TryGetDefinition(requested, out var definition)) return;
             if (!_instances.TryGetValue(definition.PanelType, out var panel)) return;
 
             panel.Hide();
@@ -123,15 +131,19 @@ namespace Framework.UI
 
         public IReadOnlyList<PanelDefinition> GetDefinitions() => new List<PanelDefinition>(_definitions.Values);
 
-        public bool IsOpen<T>() where T : class, IUIPanel
+        public bool IsOpen<T>() where T : class, IUIPanel => IsOpen(typeof(T));
+
+        public bool IsOpen(Type panelType)
         {
-            return TryGetDefinition(typeof(T), out var def)
+            return TryGetDefinition(panelType, out var def)
                    && _instances.TryGetValue(def.PanelType, out var p)
                    && _openOrder.Contains(p);
         }
 
-        public bool IsCached<T>() where T : class, IUIPanel
-            => TryGetDefinition(typeof(T), out var def) && _instances.ContainsKey(def.PanelType);
+        public bool IsCached<T>() where T : class, IUIPanel => IsCached(typeof(T));
+
+        public bool IsCached(Type panelType)
+            => TryGetDefinition(panelType, out var def) && _instances.ContainsKey(def.PanelType);
 
         public T Get<T>() where T : class, IUIPanel
             => TryGetDefinition(typeof(T), out var def) && _instances.TryGetValue(def.PanelType, out var p) ? p as T : null;
@@ -164,7 +176,7 @@ namespace Framework.UI
             if (!CheckSceneTag(definition)) return null;
             if (_instances.TryGetValue(definition.PanelType, out var cached))
             {
-                EnsureOpen(cached);
+                EnsureOpen(cached, definition);
                 return cached as IUIPanel;
             }
 
@@ -177,7 +189,7 @@ namespace Framework.UI
             if (!CheckSceneTag(definition)) return null;
             if (_instances.TryGetValue(definition.PanelType, out var cached))
             {
-                EnsureOpen(cached);
+                EnsureOpen(cached, definition);
                 return cached as IUIPanel;
             }
 
@@ -190,7 +202,7 @@ namespace Framework.UI
             if (lifecycle == null) return null;
 
             _instances[definition.PanelType] = lifecycle;
-            EnsureOpen(lifecycle);
+            EnsureOpen(lifecycle, definition);
             return panel;
         }
 
@@ -208,11 +220,31 @@ namespace Framework.UI
             return null;
         }
 
-        private void EnsureOpen(IUIPanelLifecycle lifecycle)
+        private void EnsureOpen(IUIPanelLifecycle lifecycle, PanelDefinition definition = null)
         {
             if (lifecycle == null) return;
             if (!_openOrder.Contains(lifecycle)) _openOrder.Add(lifecycle);
+            ApplyOrder(lifecycle, definition);
             lifecycle.Show();
+        }
+
+        /// <summary>
+        /// 应用层内排序：写**面板自己的** <c>Canvas.sortingOrder</c>（层基址 + 优先级），
+        /// 并用兄弟顺序做「同优先级时后开的在上」的 tie-break。
+        /// <para>
+        /// ⚠ 降级：非 <see cref="UnityEngine.Component"/> 的面板（如纯 C# 测试替身）没有 Transform/Canvas，
+        /// 直接跳过 —— 排序是增强能力，不应让托管的纯逻辑面板打不开。
+        /// </para>
+        /// </summary>
+        private void ApplyOrder(IUIPanelLifecycle lifecycle, PanelDefinition definition)
+        {
+            if (definition == null) return;
+            if (!(lifecycle is UnityEngine.Component component) || component == null) return;
+
+            var sortTarget = component.GetComponentInParent<PanelSortTarget>(true);
+            sortTarget?.SetOrder(UILayerOrder.ForPanel(definition.Layer, definition.Priority));
+
+            component.transform.SetAsLastSibling();   // 同 order 时靠兄弟顺序让「后开的」在上
         }
 
         private void LogNotRegistered(Type type) => _logger?.Error($"[UIService] Panel not registered: {type.Name}");
