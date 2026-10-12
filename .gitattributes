@@ -1,0 +1,52 @@
+# =============================================================================
+# 行尾与二进制约定
+#   · Unity 的 YAML（.unity/.prefab/.asset/.meta）在 Windows 上若混入 CRLF，
+#     很容易造成「整个文件都变了」的假 diff —— 这里强制 LF 统一。
+#   · 二进制文件禁止行尾转换，否则文件会被损坏。
+# =============================================================================
+
+# 默认：按内容自动判断文本，文本统一 LF
+* text=auto eol=lf
+
+# ---------- 二进制：禁止任何转换 ----------
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.psd   binary
+*.tga   binary
+*.exr   binary
+*.hdr   binary
+*.cubemap binary
+*.ttf   binary
+*.otf   binary
+*.ttc   binary
+*.dll   binary
+*.so    binary
+*.dylib binary
+*.a     binary
+*.wav   binary
+*.mp3   binary
+*.ogg   binary
+*.mp4   binary
+*.fbx   binary
+*.obj   binary
+*.blend binary
+*.unitypackage binary
+*.zip   binary
+*.7z    binary
+*.pdf   binary
+
+# ---------- Unity YAML：强制 LF（放在二进制规则之后，优先级更高）----------
+*.unity       text eol=lf
+*.prefab      text eol=lf
+*.asset       text eol=lf
+*.meta        text eol=lf
+*.controller  text eol=lf
+*.anim        text eol=lf
+*.mat         text eol=lf
+*.physicMaterial text eol=lf
+*.playable    text eol=lf
+
+# ---------- C# ----------
+*.cs    text diff=csharp eol=lf

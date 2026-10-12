@@ -1,0 +1,70 @@
+# =============================================================================
+# Unity 工程 .gitignore
+# 原则：只提交「人写的东西 + Unity 资产」，其它一律忽略（Unity 会重建）
+# =============================================================================
+
+# ---------- Unity 自动生成的目录（绝不能提交）----------
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Asset Store 下载缓存
+/[Aa]ssets/AssetStoreTools*
+
+# ---------- Unity 自动生成的工程文件（每次打开会重建）----------
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.lscache
+
+# ---------- 构建产物 ----------
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Addressables 远端包输出目录
+/[Ss]erverData/
+
+# 测试 / 覆盖率产物（CI 里另存为 artifact）
+/[Aa]rtifacts/
+/[Cc]ode[Cc]overage/
+
+# 工具输出：Unity-MCP 截图目录（含其 .meta）
+/[Aa]ssets/[Ss]creenshots/
+/[Aa]ssets/[Ss]creenshots.meta
+
+# ---------- IDE / 编辑器 ----------
+# 注：.vscode/ 由 Unity 的 VS Code 集成包生成、不含本机路径，故**提交**；
+#     Assets/ProBuilder Data/ 里有 ProBuilder 的调色板资产，也**提交**。
+.idea/
+.vs/
+
+# ---------- 操作系统 ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- 杂项 ----------
+*.swp
+*.swo
+*.bak
+sysinfo.txt
+crashlytics-build.properties

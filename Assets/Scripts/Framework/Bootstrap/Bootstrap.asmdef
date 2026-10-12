@@ -1,0 +1,18 @@
+{
+    "name": "Bootstrap",
+    "rootNamespace": "Framework.Bootstrap",
+    "references": [
+        "GUID:df5ccf61b5e74484e83a7092203400c0",
+        "GUID:efbaf590309de3543a1a50d59d97ac3c",
+        "GUID:578bfaeb2bb91a4498d7208b66cc7f81"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

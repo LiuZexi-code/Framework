@@ -1,0 +1,16 @@
+{
+    "name": "Abstractions",
+    "rootNamespace": "Framework.Abstractions",
+    "references": [
+        "GUID:df5ccf61b5e74484e83a7092203400c0"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
