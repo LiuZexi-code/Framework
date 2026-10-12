@@ -462,7 +462,7 @@ PR1 只**读取 + 校验 + 打日志**；PR3 实现真正的分支；**§12.5 �
 
 ### 12.5 策略收敛（2026-10-12，用户提案）：`loadMode` + `swapPolicy` → `SceneTransitionPolicy`
 
-**动机**：Loading UI 面板本来就是 **DDOL 的 UIManager 面板**（`isGlobal=1`，不受任何场景卸载影响，见 `LoadingPanelConfig` 与 `UIRootCreator` 的 `DontDestroyOnLoad`）。因此「是否显示加载画面」与加载模式**无关**；两种模式真正的差异只有「**旧场景何时释放**」。原设计用「每条场景的 `loadMode`」×「全局 `swapPolicy`」两个旋钮表达它，既耦合又表达不全（缺了「Single + 经中间场景」）。
+**动机**：Loading UI 面板本来就是 **DDOL 的 UIManager 面板**（`sceneTags` 留空 ⇒ 全局常驻，不受任何场景卸载影响，见 `LoadingPanelConfig` 与 `UIRootCreator` 的 `DontDestroyOnLoad`）。因此「是否显示加载画面」与加载模式**无关**；两种模式真正的差异只有「**旧场景何时释放**」。原设计用「每条场景的 `loadMode`」×「全局 `swapPolicy`」两个旋钮表达它，既耦合又表达不全（缺了「Single + 经中间场景」）。
 
 **新模型**：单一全局枚举 `SceneTransitionPolicy`，等价于一个 2×2 矩阵：
 

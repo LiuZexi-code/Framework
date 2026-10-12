@@ -63,7 +63,6 @@ namespace Game.Bootstrap
                         panelSO.PrefabAddress,
                         panelSO.Layer,
                         panelSO.cacheOnClose,
-                        panelSO.isGlobal,
                         panelSO.sceneTags,
                         panelSO.loadPolicy,
                         panelSO.priority,

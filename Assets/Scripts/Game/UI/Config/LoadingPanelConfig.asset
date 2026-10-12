@@ -16,7 +16,7 @@ MonoBehaviour:
   PrefabAddress: UI/Loading
   Layer: 2
   cacheOnClose: 1
-  isGlobal: 1
-  sceneTags:
-  - LoadingScene
+  sceneTags: []
   loadPolicy: 0
+  priority: 0
+  isModal: 0

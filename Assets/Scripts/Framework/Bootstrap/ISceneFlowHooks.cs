@@ -16,7 +16,15 @@ namespace Framework.Bootstrap
         /// </summary>
         IEnumerator SceneResourcePreload(IServiceResolver resolver, string sceneName, Action<float> reportProgress);
 
-        void SceneResourceRelease(IServiceResolver resolver, string sceneName);
+        /// <summary>
+        /// 退出 <paramref name="leavingScene"/> 时的资源释放钩子。
+        /// <para>
+        /// <paramref name="enteringScene"/> 是**即将进入**的场景名，必须传给需要按场景归属做清理的实现。
+        /// 典型例子：面板清理的判据是「**不属于新场景**」——为进入场景预加载的面板必须保留，
+        /// 只看 <paramref name="leavingScene"/> 会把刚预加载的东西误删（此缺陷已实测复现）。
+        /// </para>
+        /// </summary>
+        void SceneResourceRelease(IServiceResolver resolver, string leavingScene, string enteringScene);
         // ↓ Loading 相关
         IEnumerator OnLoadingBegin(IServiceResolver resolver, string targetScene);
 

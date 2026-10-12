@@ -51,17 +51,22 @@ public class PopupServiceTests
              : null;
     }
 
-    private static UIService MakeUI(bool global = true)
+    private static UIService MakeUI()
     {
         var ui = new UIService(new FakeFactory(), null, null);
-        ui.Register(Def(typeof(PanelA), global));
-        ui.Register(Def(typeof(PanelB), global));
-        ui.Register(Def(typeof(PanelC), global));
+        ui.Register(Def(typeof(PanelA)));
+        ui.Register(Def(typeof(PanelB)));
+        ui.Register(Def(typeof(PanelC)));
         return ui;
     }
 
-    private static PanelDefinition Def(Type type, bool isGlobal, bool isModal = false, int priority = 0)
-        => new PanelDefinition(type, "addr", PanelLayer.Popup, true, isGlobal, null,
+    /// <summary>
+    /// 面板定义。⚠️ 阶段 B 后「是否全局」由 <paramref name="sceneTags"/> 派生：
+    /// 传 null/空 ⇒ 全局（跨场景常驻），非空 ⇒ 按场景（会被场景释放销毁）。
+    /// </summary>
+    private static PanelDefinition Def(Type type, string[] sceneTags = null, bool isModal = false, int priority = 0)
+        => new PanelDefinition(type, "addr", PanelLayer.Popup, true,
+                               sceneTags == null ? null : new List<string>(sceneTags),
                                LoadPolicy.OnDemand, priority, isModal);
 
     private static PopupService MakePopups(UIService ui) => new PopupService(ui, null);
@@ -205,8 +210,8 @@ public class PopupServiceTests
     public void Stack_IsPruned_WhenSceneDisposalDestroysPanels()
     {
         var ui = new UIService(new FakeFactory(), null, null);
-        ui.Register(Def(typeof(PanelA), isGlobal: false));   // PerScene
-        ui.Register(Def(typeof(PanelB), isGlobal: true));    // 全局 → 存活
+        ui.Register(Def(typeof(PanelA), new[] { "SceneX" }));   // 按场景声明
+        ui.Register(Def(typeof(PanelB)));                       // sceneTags 为空 → 全局，存活
         PreloadAll(ui);
 
         var popups = MakePopups(ui);
@@ -214,9 +219,9 @@ public class PopupServiceTests
         popups.Push<IPanelB>();
         Assert.AreEqual(2, popups.Depth);
 
-        ui.DisposeScenePanels();   // 只销毁非全局面板
+        ui.DisposeScenePanels("SceneY");   // 进入 SceneY：只保留全局 + 标签命中 SceneY 的实例
 
-        Assert.AreEqual(1, popups.Depth, "被销毁的 PerScene 面板应被剔除，全局面板保留");
+        Assert.AreEqual(1, popups.Depth, "被销毁的按场景面板应被剔除，全局面板保留");
         Assert.IsNotNull(popups.Peek<IPanelB>());
     }
 

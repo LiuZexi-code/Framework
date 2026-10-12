@@ -148,13 +148,22 @@ namespace Framework.UI
         public T Get<T>() where T : class, IUIPanel
             => TryGetDefinition(typeof(T), out var def) && _instances.TryGetValue(def.PanelType, out var p) ? p as T : null;
 
-        public void DisposeScenePanels()
+        /// <summary>
+        /// 场景退出时清理「不属于新场景」的面板实例（保留定义，便于再次打开时重建）。
+        /// <para>
+        /// <b>必须传「进入的场景名」</b>：判据是 <see cref="SurvivesScene"/>，
+        /// 这样「为**进入场景**预加载的面板」不会被这一步误销毁。
+        /// ⚠️ 不要用 <see cref="ISceneService.ActiveSceneName"/> —— 切换过程中它还是**旧场景**
+        /// （同一个坑见 <see cref="CheckSceneTag"/> 的注释）。
+        /// </para>
+        /// </summary>
+        public void DisposeScenePanels(string enteringScene)
         {
-            // 销毁所有 PerScene 面板实例（保留定义，便于再次打开时重建）
+            // 销毁不属于新场景的面板实例（全局 / 标签命中新场景的实例保留）
             var toRemove = new List<Type>();
             foreach (var kv in _definitions)
             {
-                if (kv.Value.IsGlobal) continue;
+                if (SurvivesScene(kv.Value, enteringScene)) continue;
                 if (_instances.TryGetValue(kv.Key, out var panel))
                 {
                     panel.Hide();
@@ -166,6 +175,21 @@ namespace Framework.UI
 
             foreach (var t in toRemove) _instances.Remove(t);
             _openOrder.RemoveAll(p => !_instances.ContainsKey(p.GetType()));
+        }
+
+        /// <summary>
+        /// 面板实例在「进入 <paramref name="enteringScene"/>」之后是否应继续存活。
+        /// <para>
+        /// 判据：无标签（= 全局，所有场景通用）→ 存活；否则标签需包含新场景。
+        /// 拿不到场景名时**保守存活**（宁可不销毁，也不要误删）。
+        /// </para>
+        /// </summary>
+        internal static bool SurvivesScene(PanelDefinition definition, string enteringScene)
+        {
+            if (definition == null) return true;                       // 定义缺失 → 不销毁
+            if (definition.IsGlobal) return true;                      // 无标签 = 所有场景通用
+            if (string.IsNullOrEmpty(enteringScene)) return true;      // 拿不到目标场景 → 不销毁
+            return definition.SceneTags.Contains(enteringScene);
         }
 
         // ---------- 内部 ----------
@@ -251,7 +275,7 @@ namespace Framework.UI
 
         /// <summary>
         /// 场景标签校验（只在「打开」时生效）：
-        /// 未声明 SceneTags / 全局面板 / 拿不到当前场景 → 放行；
+        /// 未声明 SceneTags（= 全局）/ 拿不到当前场景 → 放行；
         /// 否则当前场景必须在 SceneTags 内，否则按 <see cref="UISettings.EnforceSceneTags"/> 拒绝或仅警告。
         /// </summary>
         /// <remarks>
@@ -261,8 +285,10 @@ namespace Framework.UI
         private bool CheckSceneTag(PanelDefinition definition)
         {
             var tags = definition.SceneTags;
-            if (tags == null || tags.Count == 0) return true;   // 未声明 = 所有场景通用
-            if (definition.IsGlobal) return true;               // 全局面板与场景无关（SceneTags 对其无效）
+            // 未声明 = 所有场景通用。
+            // ⚠ 曾经这里还跟了一句 `if (definition.IsGlobal) return true;` —— 阶段 B 之后
+            //   IsGlobal 就是「SceneTags 为空」的派生属性，那句已成死代码，故删除。
+            if (tags == null || tags.Count == 0) return true;
 
             var scene = _sceneService?.ActiveSceneName;
             if (string.IsNullOrEmpty(scene)) return true;       // 拿不到当前场景 → 不拦截

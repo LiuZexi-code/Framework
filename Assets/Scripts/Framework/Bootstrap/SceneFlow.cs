@@ -227,7 +227,7 @@ namespace Framework.Bootstrap
             {
                 Log.Info($"[SceneFlow] 先卸载旧场景（AdditiveUnloadFirst）：{prevScene}");
                 yield return _sceneService.UnloadAsync(prevScene);
-                ReleaseScene(prevScene);
+                ReleaseScene(prevScene, sceneName);
                 prevScene = null;
                 releasedOldFirst = true;
             }
@@ -291,7 +291,7 @@ namespace Framework.Bootstrap
                     if (ShouldRelease(prevScene, sceneName))
                     {
                         yield return _sceneService.UnloadAsync(prevScene);
-                        ReleaseScene(prevScene);
+                        ReleaseScene(prevScene, sceneName);
                     }
                     yield return _sceneService.UnloadAsync(_loadingSceneName);
                 }
@@ -354,7 +354,7 @@ namespace Framework.Bootstrap
                 // Single 模式下旧场景已被引擎关闭，但**仍需调用** UnloadAsync：
                 // 由场景服务负责区分「真卸载」与「只释放句柄」（否则 Addressables 会泄漏）。
                 yield return _sceneService.UnloadAsync(prevScene);
-                ReleaseScene(prevScene);
+                ReleaseScene(prevScene, sceneName);
             }
 
             // 7.1 Single 过渡用的 Loading 场景已被目标场景的 Single 加载自动关闭 ——
@@ -413,7 +413,7 @@ namespace Framework.Bootstrap
             if (!alreadyActive && ShouldRelease(prevScene, sceneName))
             {
                 yield return _sceneService.UnloadAsync(prevScene);
-                ReleaseScene(prevScene);
+                ReleaseScene(prevScene, sceneName);
             }
 
             RestoreTransitionOverrides();   // 兜底：旧场景未被卸载时恢复其音频/灯光
@@ -617,11 +617,17 @@ namespace Framework.Bootstrap
             return !(_catalog.TryGet(prevScene, out var definition) && definition.Persistent);
         }
 
-        /// <summary>触发旧场景的资源/面板释放钩子（卸载与释放是两件事：Single 下场景已被引擎关闭，仍须释放）。</summary>
-        private void ReleaseScene(string sceneName)
+        /// <summary>
+        /// 触发旧场景的资源/面板释放钩子（卸载与释放是两件事：Single 下场景已被引擎关闭，仍须释放）。
+        /// <para>
+        /// <paramref name="enteringScene"/> 必须一并传下去：释放的判据是「**不属于新场景**」
+        /// （例如为进入场景预加载的面板要保留），只看离开的场景会误删刚预加载的东西。
+        /// </para>
+        /// </summary>
+        private void ReleaseScene(string leavingScene, string enteringScene)
         {
-            try { _hooks.SceneResourceRelease(_globalResolver, sceneName); }
-            catch (Exception e) { Debug.LogError($"[SceneFlow] 释放 {sceneName} 失败: {e}"); }
+            try { _hooks.SceneResourceRelease(_globalResolver, leavingScene, enteringScene); }
+            catch (Exception e) { Debug.LogError($"[SceneFlow] 释放 {leavingScene} 失败: {e}"); }
         }
 
         /// <summary>

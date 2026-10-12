@@ -285,14 +285,14 @@ graph TD
 - `Bootstrap/UIPanelSetupStep.cs` —— **启动步骤**：应用 UI 配置（分辨率/匹配）并注册全部面板（原先写在 `MyBootstrapRunner` 里）。
 - （已删除 `FrameworkStartEntry.cs` / `MyGameRoot.cs` / `MyBootstrapRunner.cs`：已收进框架，业务层不再需要。）
 - （已删除 `Bootstrap/DemoScenePreloadStep.cs`：2026-10-12 —— 场景专属预加载已改为**配置驱动**，见 `Scenes/Config/` + 内置步骤 `PreloadSceneAddressesStep`。）
-- `UI/Config/DemoPanelConfig.asset` —— DemoPanel 的配置条目：`isGlobal=0` + `sceneTags=[SampleScene]` + `loadPolicy=Preload`，同时演示**预加载筛选**与**打开校验**。
+- `UI/Config/DemoPanelConfig.asset` —— DemoPanel 的配置条目：`sceneTags=[SampleScene]` + `loadPolicy=Preload`，同时演示**预加载筛选**与**打开校验**。
 - `Modules/GameSceneServiceModule.cs` —— **示例：把场景服务切为 Addressables 版**（`Order=0` 覆盖框架默认）。
 - `Config/DemoTuningConfig.cs` —— **示例配置**：纯代码配置 + `IConfigFactory`，演示“加配置不改启动代码”。
 - `Modules/DemoGlobalModule.cs` —— **示例模块**：同时实现全局/场景服务注册，演示“加服务不改框架”。
 - `UI/LoadingPanel.cs` —— Loading 面板：`Game.UI.LoadingPanel : UIPanelBase, ILoadingPanel`。
 - （已删除未引用的空模板 `PlayerController.cs` / `Services/NewBehaviourScript.cs`。）
 - `UI/Config/` —— `UIConfigAssetSO`、`UIPanelConfigSO`、`UIConfigAsset.asset`、`UIConfigFactory`。
-- `UIPanelConfig.asset`（Game 根目录，疑似遗留）。
+- （已删除 `UIPanelConfig.asset`：2026-10-12 —— 未被 `UIConfigAsset` 引用且字段与现模型不符的遗留资产。）
 - `Bootstrap/SceneCatalogSetupStep.cs` —— **场景配置步骤**（2026-10-12）：把 `SceneConfigAssetSO` 转成运行期 `ISceneCatalog` + 启动期校验（设计稿 §6）。
 - `Scenes/Config/` —— **场景配置**（2026-10-12）：`SceneConfigSO`（单项）、`SceneConfigAssetSO`（总表 + `SceneRegistration`）、`SceneConfigFactory`、`SceneConfigValidation`、`SceneCatalog.asset`。用法与字段见 `SCENE_CONFIG_DESIGN.md`。
 - `Editor/` —— **编辑器工具**（`Game-Editor` 程序集，以 `-Editor` 结尾故不会被模块扫描）：`SceneNameUtility`、`SceneNameDrawer`、`SceneConfigSynchronizer`、`SceneConfigAssetEditor`。
@@ -413,13 +413,21 @@ sequenceDiagram
 - 支持构造函数注入 `ILogger`（容器自动注入）；未注入时回退静态门面 `Log`（兼容手动 `new`）。
 
 ### 5.9 UI 系统
-- `IUIService`：`Register`/`Unregister`/`Open<T>`/`OpenAsync<T>`/`Close<T>`/`CloseAll`/`PreloadAsync<T>`/`IsOpen`/`IsCached`/`Get`/`DisposeScenePanels`。
+- `IUIService`：`Register`/`Unregister`/`Open<T>`/`OpenAsync<T>`/`Close<T>`/`CloseAll`/`PreloadAsync<T>`/`IsOpen`/`IsCached`/`Get`/`DisposeScenePanels(string enteringScene)`；另有非泛型版 `Open/OpenAsync/Close/IsOpen/IsCached(Type)` 供运行时类型驱动的代码（如弹窗栈）使用。
 - `UIService` 依赖 `IPanelFactory` + `IEventBus` + `ILogger`；面板需实现 **`IUIPanelLifecycle`**（已 `public`，推荐继承 `UIPanelBase`）才能被创建托管。
 - `PanelFactory`：`Create`（要求已预加载，走 `TryGetLoaded`）、`CreateAsync`（走 Addressables）、`Destroy`。
-- `UIRoot`：6 层 Canvas（Background/Normal/HighFrequency/Popup/Toast/Overlay）；缩放参数由 `UISettings`（Abstractions）提供，业务可在启动时用 UI 配置覆盖参考分辨率/匹配模式。`UIRootCreator` 还会在需要时自动补一个常驻 `EventSystem`。
-- `PanelDefinition`：`PanelType`/`PrefabAddress`/`Layer`/`CacheOnClose`/`IsGlobal`/`loadPolicy`/`SceneTags`。
-- **面板场景标签校验（2026-10-12）**：`UISettings.EnforceSceneTags`（默认 `true`）控制 `UIService.CheckSceneTag(PanelDefinition)` 的行为 —— 判据：定义无标签 → 放行；`IsGlobal` → 放行（全局面板不属于任何场景）；当前无活动场景 → 放行；`SceneTags` 包含当前活动场景名 → 放行；否则记**警告**，且 `EnforceSceneTags=true` 时**拒绝打开**（`Open`/`OpenAsync` 直接返回 null），`false` 时仅告警仍照常打开。
+- `UIRoot`：6 层 Canvas（Background/Normal/HighFrequency/Popup/Toast/Overlay，层 Canvas order = `UILayerOrder.BaseOf` = 1000/2000/3000/4000/5000/6000）；缩放参数由 `UISettings`（Abstractions）提供，业务可在启动时用 UI 配置覆盖参考分辨率/匹配模式。`UIRootCreator` 还会在需要时自动补一个常驻 `EventSystem`。
+- `PanelDefinition`：`PanelType`/`PrefabAddress`/`Layer`/`CacheOnClose`/`loadPolicy`/`SceneTags`/`Priority`/`IsModal`；`IsGlobal` 是**派生只读属性**（`SceneTags` 为空 ⇒ 全局/跨场景常驻），不再有独立字段。
+- **排序**：面板 order = `UILayerOrder.ForPanel(Layer, Priority)` = `层基址 + 1 + Clamp(Priority)`，写到**面板自己的** Canvas（`PanelSortTarget`，`overrideSorting=true` + 自带 `GraphicRaycaster`）；同 order 时靠兄弟顺序做「后开的在上」。
+  - ⚠️ **嵌套 Canvas 两条静默失效规则**（都实测过）：先写 `overrideSorting` 再写 `sortingOrder`；且**必须先挂到最终父级再配置**（`SetParent` 会重置 `overrideSorting`）。已收口到 `NestedCanvas`。
+- `IPopupService`/`PopupService`（`Framework.UI`）：全局单栈（`Push/Pop/PopAll/PopTo/Peek/Depth/CanPop/Clear` + `Pushed/Popped`）；重复 Push 同一面板 = 提到栈顶；模态面板由共享 `PopupBlocker`（order = `modal.order - 1`，全透明但吃点击）挡住其下层。设计稿 `UI_POPUP_DESIGN.md`。
+- **面板场景标签校验（2026-10-12）**：`UISettings.EnforceSceneTags`（默认 `true`）控制 `UIService.CheckSceneTag(PanelDefinition)` 的行为 —— 判据：定义无标签（= 全局）→ 放行；当前无活动场景 → 放行；`SceneTags` 包含当前活动场景名 → 放行；否则记**警告**，且 `EnforceSceneTags=true` 时**拒绝打开**（`Open`/`OpenAsync` 直接返回 null），`false` 时仅告警仍照常打开。
   - ⚠️ **该校验不作用于 `PreloadAsync`**：预加载发生在切换过程中，此时 ActiveScene 还是**旧场景**，按标签判定会误拒。预加载的场景筛选由 `PreloadPanelsStep` 用 `ILoadContext.SceneName`（目标场景）负责 —— 两者职责不同，不要合并。
+- **同一个 `sceneTags` 一行决定三件事**（打开校验 + 预加载筛选 + 销毁判定），因此误填的代价是「打不开 + 被销毁」。
+- **场景退出清理：`DisposeScenePanels(enteringScene)`**：判据是「**不属于新场景的实例才销毁**」= `IsGlobal || SceneTags.Contains(enteringScene)`。
+  - 🔴 **修复的真缺陷（2026-10-12）**：原实现**无差别**销毁所有非全局面板 —— 而切换流程会「先为**进入**场景预加载面板，再释放**离开**的场景」，于是刚预加载的面板被同一次切换白白销毁（实测 `IsCached(DemoPanel) == false`，且预制体句柄一并释放）。
+  - ⚠️ 传的必须是**进入的场景名**，不能用 `ActiveSceneName`（Additive 过渡期它还是旧场景 —— 与 `CheckSceneTag` 是同一个坑）。因此 `ISceneFlowHooks.SceneResourceRelease` 已加为 `(resolver, leavingScene, enteringScene)` 三个参数。
+  - 拿不到目标场景名时**保守存活**（不销毁），宁可少清理也不误删。
 
 ### 5.10 日志
 - `ILogger` + `LogLevel`；`UnityLogger`、`NullLogger`；静态门面 `Log`（命名空间为 `Framework.Adapters.Logging`）。
@@ -597,11 +605,12 @@ sequenceDiagram
   3. 放在 `Game` 程序集即可 —— 启动时自动注册，**无需改框架**（示例：`Game/Modules/DemoGlobalModule.cs`）。
   说明：容器已支持**构造函数注入**，`registry.Register<IFoo,Foo>()` 可直接用（依赖自动解析）；仅在需要自定义构造逻辑时才用 `RegisterFactory<IX>(...)`。
 - **新增场景级服务**：实现 `ISceneServiceModule.RegisterScene(registry, sceneName)`，每个场景建容器时自动注册（同见 `DemoGlobalModule`）。
-- **跑单元测试**：Test Runner → EditMode（共 **70 例**：`ServiceCollectionTests` 18 / `UIServiceTests` 12 / `SceneFlowTests` 24 / `SceneCatalogTests` 5 / `SceneConfigTests` 10 / 示例 1），或 MCP `run_tests`。
+- **跑单元测试**：Test Runner → EditMode（共 **89 例**：`ServiceCollectionTests` 18 / `UIServiceTests` 15 / `SceneFlowTests` 24 / `SceneCatalogTests` 5 / `SceneConfigTests` 10 / `UILayerOrderTests` 6 / `PopupServiceTests` 11），或 MCP `run_tests`。
+  - ⚠️ 跑过 Play 之后再跑测试，若出现「Unhandled log message」类失败，多半是 `Log` 静态门面残留了 `UnityLogger`（已由 `Tests/TestSuiteSetup.cs` 的 `[SetUpFixture]` 复位）。
 - **新增 UI 面板**：
   1. 建预制体，挂实现 `IUIPanelLifecycle`（推荐继承 `UIPanelBase`）的脚本，加 `[UIPanel("key")]`；
   2. 把预制体加入 Addressables 并记地址；
-  3. 在 `UIConfigAsset.asset` 的 `panels` 中登记（`panelKey`/`PrefabAddress`/`Layer`/`isGlobal`…）；
+  3. 在 `UIConfigAsset.asset` 的 `panels` 中登记（`panelKey`/`PrefabAddress`/`Layer`/`sceneTags`/`priority`/`isModal`…）；
   4. 调用 `IUIService.OpenAsync<T>()`。
 - **新增配置（零改动）**：① 实现 `GameConfigBase`（需要资产则用 `ConfigBySO<TSO>`）② 新建一个实现 `IConfigFactory` 的类放在 `Game` 程序集（公开无参构造）③ 若用资产，把资产加入 Addressables。启动时 `GameConfigRegistry` 自动完成「预热 → 注册 → 加载」，**无需改启动代码**（示例：`Game/Config/DemoTuningConfig.cs`、`Game/UI/Config/UIConfigFactory.cs`）。读取：`IGameConfigService.TryGet<T>(out var cfg)`。
 - **新增/修改配置项顺序**：`GameConfigBase(configId, loadOrder)` 的 `loadOrder` 决定 `LoadAll` 顺序（升序）。UI 缩放：把 `UISettings` 的 `ReferenceResolution`/`MatchWidthOrHeight` 写成业务配置驱动即可（样例见 `UIPanelSetupStep`）。
@@ -616,10 +625,10 @@ sequenceDiagram
   2. 在 `SceneCatalog.asset` 里加一条 `SceneConfigSO`，填 `sceneName`（场景名下拉可直接选）；
   3. 点检视面板的「同步场景登记」→ 自动写进 Addressables（或 Build Settings，按 `registration` 字段）；
   4. 需要专属预加载 → 在配置项里填 `preloadAddresses`（**不用再写代码**）；
-  5. 需要专属面板 → 面板配置里 `isGlobal=0` + `sceneTags=[Xxx]`。
+  5. 需要专属面板 → 面板配置里填 `sceneTags=[Xxx]`（**留空 = 全局常驻**，不会随场景清理）。
   > 完整字段说明与设计取舍见 `SCENE_CONFIG_DESIGN.md`。
 - **场景配置化（与 UI 对称）**：`SceneCatalog.asset`（总表）→ `SceneConfigFactory`（自动发现）→ `SceneCatalogSetupStep` → `ISceneCatalog`。运行期查询：`ISceneFlow.GetDefinition(name)` 或 `ISceneCatalog.TryGet(name, out var def)`（含 `Tags`/`Persistent`/`PreloadAddresses`）。配置缺失时只告警，切换回退到默认策略（**零配置项目行为不变**）。
-- **面板只在某些场景可用（场景标签）**：面板配置填 `sceneTags`（列表）→ 不匹配时会**拒绝打开并告警**；全局面板（`isGlobal=1`）忽略标签。想「只告警不拦截」把 `UISettings.EnforceSceneTags` 设为 `false`（在启动步骤里实例化 `UISettings { EnforceSceneTags = false }` 注册给容器）。
+- **面板只在某些场景可用（场景标签）**：面板配置填 `sceneTags`（列表）→ 不匹配时会**拒绍打开并告警**，且进入其他场景时会被销毁；**留空 = 所有场景通用（跨场景常驻）**。想「只告警不拦截」把 `UISettings.EnforceSceneTags` 设为 `false`（在启动步骤里实例化 `UISettings { EnforceSceneTags = false }` 注册给容器）。
 - **编辑器自测菜单**：`Tools/我的工具/Addressables资源加载测试`、`Tools/我的工具/内存持久化测试/*`、`Tools/我的工具/本地Json持久化测试/*`（依赖 `ServiceLocator` 已就绪，正常运行模式下才可用）。
 
 ### MCP 自动化验证提示（重要）

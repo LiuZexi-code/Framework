@@ -269,10 +269,10 @@ public class SceneFlowTests
             yield return null;
         }
 
-        public void SceneResourceRelease(IServiceResolver resolver, string sceneName)
+        public void SceneResourceRelease(IServiceResolver resolver, string leavingScene, string enteringScene)
         {
-            Released.Add(sceneName);
-            Sequence.Add("release:" + sceneName);
+            Released.Add(leavingScene);
+            Sequence.Add("release:" + leavingScene + "->" + enteringScene);
         }
 
         public IEnumerator OnLoadingBegin(IServiceResolver resolver, string targetScene)
@@ -891,7 +891,7 @@ public class SceneFlowTests
         Assert.AreEqual("B", flow.CurrentSceneName);
         Assert.Less(scene.Sequence.IndexOf("unload:A"), scene.Sequence.IndexOf("load:B"),
             "先卸后载：旧场景卸载必须发生在新场景加载之前");
-        Assert.Less(hooks.Sequence.IndexOf("release:A"), hooks.Sequence.IndexOf("preload:B"),
+        Assert.Less(hooks.Sequence.IndexOf("release:A->B"), hooks.Sequence.IndexOf("preload:B"),
             "旧场景释放必须发生在目标资源预加载之前（否则内存峰值不变，策略失去意义）");
         CollectionAssert.AreEqual(new[] { true }, scene.LightEnabledAtUnload["A"],
             "先卸后载下不存在共存窗口 → 不应再关闭旧场景灯光（音频/灯光补丁被旁路）");
@@ -919,6 +919,15 @@ public class SceneFlowTests
         public void Destroy() { }
     }
 
+    /// <summary>为「进入的场景」声明的面板（回归：场景释放不得销毁它）。</summary>
+    private sealed class EnteringScenePanel : IUIPanel, IUIPanelLifecycle
+    {
+        public void Create(IEventBus bus, ILogger logger) { }
+        public void Show() { }
+        public void Hide() { }
+        public void Destroy() { }
+    }
+
     private sealed class NoopPanelFactory : IPanelFactory
     {
         public IUIPanel Create(PanelDefinition definition) => NewPanel(definition);
@@ -935,24 +944,29 @@ public class SceneFlowTests
     }
 
     [Test]
-    public void SceneResourceRelease_DisposesPerScenePanels_ButKeepsGlobalPanels()
+    public void SceneResourceRelease_DisposesLeavingScenePanels_ButKeepsGlobalAndEnteringScenePanels()
     {
         var container = new ServiceCollection();
         var ui = new UIService(new NoopPanelFactory(), null, null);
         container.Register<IUIService>(ui);
 
-        ui.Register(new PanelDefinition(typeof(ScenePanel), "addr", PanelLayer.Normal, true, false, null));
-        ui.Register(new PanelDefinition(typeof(GlobalPanel), "addr2", PanelLayer.Normal, true, true, null));
+        // 无标签 = 全局常驻；非空标签 = 只属于那些场景
+        ui.Register(new PanelDefinition(typeof(GlobalPanel), "addr2", PanelLayer.Normal, true, null));
+        ui.Register(new PanelDefinition(typeof(ScenePanel), "addr", PanelLayer.Normal, true,
+                                        new List<string> { "A" }));          // 离开的场景
+        ui.Register(new PanelDefinition(typeof(EnteringScenePanel), "addr3", PanelLayer.Normal, true,
+                                        new List<string> { "B" }));          // 进入的场景
 
-        ui.Open<ScenePanel>();
         ui.Open<GlobalPanel>();
-        Assert.IsTrue(ui.IsCached<ScenePanel>());
-        Assert.IsTrue(ui.IsCached<GlobalPanel>());
+        ui.Open<ScenePanel>();
+        ui.Open<EnteringScenePanel>();
 
-        // 场景退出：DefaultSceneFlowHooks 应清理 PerScene 面板
-        new DefaultSceneFlowHooks().SceneResourceRelease(container, "A");
+        // A → B：DefaultSceneFlowHooks 应只清理「不属于 B」的面板
+        new DefaultSceneFlowHooks().SceneResourceRelease(container, "A", "B");
 
-        Assert.IsFalse(ui.IsCached<ScenePanel>(), "PerScene 面板应在场景释放时被销毁");
+        Assert.IsFalse(ui.IsCached<ScenePanel>(), "只为离开场景声明的面板应被销毁");
         Assert.IsTrue(ui.IsCached<GlobalPanel>(), "全局面板不应被场景释放影响");
+        Assert.IsTrue(ui.IsCached<EnteringScenePanel>(),
+            "为**进入场景**预加载的面板必须保留（旧实现无差别销毁全部非全局面板，本用例是其回归）");
     }
 }

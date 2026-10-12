@@ -162,9 +162,10 @@ public sealed class ShopPanel : UIPanelBase
 | `PrefabAddress` | `UI/ShopPanel` | Addressables 地址 |
 | `Layer` | `Popup` | 决定挂到哪层 Canvas（见下表） |
 | `cacheOnClose` | `true` | 关闭时只隐藏、不销毁 |
-| `isGlobal` | `false` | `false` = PerScene，场景退出时自动销毁 |
-| `sceneTags` | 空 | 空 = 所有场景可用 |
+| `sceneTags` | `[SampleScene]` | 属于哪些场景。**留空 = 所有场景通用（跨场景常驻）** |
 | `loadPolicy` | — | 加载策略 |
+| `priority` | `0` | 层内优先级（越大越靠上，只在同 `Layer` 内生效） |
+| `isModal` | `false` | 是否模态（弹窗栈会挡住其下层的点击；Toast 不要勾） |
 
 打开面板：
 
@@ -172,20 +173,23 @@ public sealed class ShopPanel : UIPanelBase
 await ServiceLocator.Get<IUIService>().OpenAsync<ShopPanel>();
 ```
 
-**层级与 sortingOrder**（`UIRootCreator` 自动创建）：
+**层级与 `sortingOrder`**（`UIRootCreator` 自动创建，`UILayerOrder` 定义）：
 
-| 层 | Canvas 名 | sortingOrder | 用途 |
+| 层 | Canvas 名 | 层 Canvas order | 面板 order |
 |---|---|---|---|
-| `Background` | `Canvas_Background` | -100 | 静态背景 |
-| `Normal` | `Canvas_Normal` | 0 | 低频 UI（主菜单、设置） |
-| `HighFrequency` | `Canvas_HighFrequency` | 100 | 高频刷新（HUD、血条） |
-| `Popup` | `Canvas_Popup` | 200 | 弹窗 |
-| `Toast` | `Canvas_Toast` | 300 | 轻提示 |
-| `Overlay` | `Canvas_Overlay` | 400 | 顶层遮罩/转场 |
+| `Background` | `Canvas_Background` | 1000 | 1001 起 |
+| `Normal` | `Canvas_Normal` | 2000 | 2001 起 |
+| `HighFrequency` | `Canvas_HighFrequency` | 3000 | 3001 起 |
+| `Popup` | `Canvas_Popup` | 4000 | 4001 起 |
+| `Toast` | `Canvas_Toast` | 5000 | 5001 起 |
+| `Overlay` | `Canvas_Overlay` | 6000 | 6001 起 |
+
+面板 order = `层基址 + 1 + Clamp(priority)`（严格高于自己层的 Canvas）。场景相机/Canvas 默认在 0，所以 UI 永远在他们之上。
+同 order 时靠**打开顺序**决定（后开的在上）。
 
 **分辨率**由 `UIConfigAsset` 的 `referenceResolution` / `matchWidthOrHeight` 驱动（写入 `UISettings`），不用改代码。
 
-**场景预加载**：把面板设为 `isGlobal = false` + `loadPolicy = Preload`（可选填 `sceneTags` 限定场景），
+**场景预加载**：给面板填 `loadPolicy = Preload` + `sceneTags` 包含目标场景（**不能留空** —— 留空 = 全局常驻，不会按场景预加载），
 框架会在**进入该场景前**把它预加载到内存（隐藏态），进场景后 `Open<T>()` 即为瞬开。
 日志形如：`[Load] 预加载面板：1 个（ShopPanel）`。
 
@@ -273,13 +277,17 @@ ServiceLocator.Get<ISceneFlow>().SwitchScene("Level2");
 **场景生命周期钩子**（可选）：实现 `ISceneFlowHooks`：
 
 ```csharp
-RegisterSceneServices(container, sceneName)       // 建场景容器时（默认转发给场景模块注册）
-SceneResourcePreload(resolver, sceneName, report) // 切换进度 5%→30%；report(0..1) 上报局部进度
-SceneResourceRelease(resolver, sceneName)         // 旧场景卸载后（默认会清理 PerScene 面板）
-OnLoadingBegin / OnLoadingProgress(同步) / OnLoadingEnd   // Loading 遮罩显隐与进度
+RegisterSceneServices(container, sceneName)                     // 建场景容器时（默认转发给场景模块注册）
+SceneResourcePreload(resolver, sceneName, report)               // 切换进度 5%→30%；report(0..1) 上报局部进度
+SceneResourceRelease(resolver, leavingScene, enteringScene)     // 旧场景卸载后（默认清理「不属于新场景」的面板）
+OnLoadingBegin / OnLoadingProgress(同步) / OnLoadingEnd          // Loading 遮罩显隐与进度
 ```
 
-> 默认实现 `DefaultSceneFlowHooks` 已经做了：Loading 面板显隐、场景模块注册、场景预加载、PerScene 面板清理。
+> ⚠️ `SceneResourceRelease` 有 **两个** 场景参数：`leavingScene` 与 `enteringScene`。
+> 清理的判据是「**不属于新场景**」（例如为进入场景预加载好的面板必须保留），
+> 只看离开的场景会把刚预加载的东西误删。
+>
+> 默认实现 `DefaultSceneFlowHooks` 已经做了：Loading 面板显隐、场景模块注册、场景预加载、按场景归属清理面板。
 > 通常**不需要**自己写钩子；只想加预加载内容的话用 2.5 的 `ISceneLoadStepProvider`。
 
 ---
@@ -305,13 +313,12 @@ public sealed class GameSceneServiceModule : IGlobalServiceModule
 
 ### 2.8 让面板只在某些场景可用（面板场景标签）
 
-面板配置里的 `sceneTags` 决定「此面板属于哪些场景」：
+面板配置里的 `sceneTags` 一行决定三件事，**留空则是全局常驻**：
 
-| 配置 | 行为 |
-|---|---|
-| `sceneTags` 为空 | 任何场景都可打开 |
-| `isGlobal = true` | 忽略 `sceneTags`（全局面板不属于任何场景） |
-| `sceneTags = [SampleScene]` | 在 `SampleScene` 可开；在其他场景打开会被**拒绝并告警** |
+| 配置 | 打开校验 | 进场景前预加载 | 离开场景时销毁 |
+|---|---|---|---|
+| `sceneTags` 为空 | 任何场景都可开 | 不预加载（视为全局） | **不销毁**（跨场景常驻） |
+| `sceneTags = [SampleScene]` | 仅 `SampleScene` 可开，其他场景**拒绍并告警** | 进入 `SampleScene` 前预加载 | 进入其他场景时销毁 |
 
 ```csharp
 // 启动步骤里可关掉「强制拦截」，改成只告警（默认 true = 拦截）
@@ -321,7 +328,7 @@ services.Register(new UISettings { EnforceSceneTags = false });
 同一个 `sceneTags` 还会和 `loadPolicy` 配合，决定**进入场景前要不要预加载**那个面板：
 
 ```text
-loadPolicy = Preload + isGlobal = false + sceneTags 包含目标场景  →  进场景前预实例化并隐藏
+loadPolicy = Preload + sceneTags 非空且包含目标场景  →  进场景前预实例化并隐藏
 ```
 
 > 小贴士：**预加载筛选看的是「目标场景」**（切换中 ActiveScene 还是旧场景），
@@ -436,7 +443,9 @@ Assets/Scripts/
 4. 模块类 / `IConfigFactory` 需要**公开无参构造函数**。
 5. 面板脚本必须实现 `IUIPanelLifecycle`（推荐继承 `UIPanelBase`），否则 `UIService` 会报「未实现 IUIPanelLifecycle」。
 6. `UIRoot` 是**懒创建**的（首次实例化面板时），且位于 `DontDestroyOnLoad` 场景 → 场景层级面板/搜索工具**看不到它**，排查请用日志。
-7. 非全局面板请设 `isGlobal = false`；否则切场景后不会随场景清理（默认由 `SceneResourceRelease → DisposeScenePanels()` 处理 PerScene 面板）。
+7. 需要「跨场景常驻」的面板，把配置里的 `sceneTags` **留空**（空 = 全局，切场景不清理）；
+   填了 `sceneTags` 的面板只在那些场景存活，由 `SceneResourceRelease → DisposeScenePanels(enteringScene)` 自动清理。
+   ⚠️ 传入的是**进入的场景**（不是 `ActiveSceneName` —— 切换中它还是旧场景）。
 8. 首次 Addressables 加载前框架已做预热，避免同步 `WaitForCompletion` 与初始化互锁；**新增配置请走 `IConfigFactory`**（会被一并预热），不要自己在别处同步加载。
 9. `LoadingScene` 作为**常驻叠加层**使用时必须是纯 UI（**不要放 Camera / Directional Light**，也不需要 EventSystem）；框架会在加载完成后把它整体 `SetActive(false)`，只在切换期间显示。
 10. 用 MCP/自动化驱动 Play 验证时，编辑器失焦会暂停播放循环（`Application.runInBackground` 默认 `false`）→ 先置 `true`，否则看到的是「启动卡死」假象。

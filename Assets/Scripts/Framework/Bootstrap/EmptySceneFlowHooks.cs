@@ -13,7 +13,7 @@ namespace Framework.Bootstrap
             reportProgress?.Invoke(1f);
             yield return null;
         }
-        public void SceneResourceRelease(IServiceResolver r, string n) { }
+        public void SceneResourceRelease(IServiceResolver r, string leavingScene, string enteringScene) { }
 
         // ↓ Loading 相关
         public IEnumerator OnLoadingBegin(IServiceResolver resolver, string targetScene){yield return null;}

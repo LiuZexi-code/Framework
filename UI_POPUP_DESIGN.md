@@ -138,17 +138,26 @@ public interface IPopupService
 
 ### 5.3 场景切换
 
-> 🔴 **实施中发现的现存缺陷（待本阶段修复）**：启动时日志先出现 `[Load] 预加载面板：1 个（DemoPanel）`（为**进入**的场景预加载），
+> ✅ **已修复的现存缺陷（2026-10-12，阶段 3）**：启动时日志先出现 `[Load] 预加载面板：1 个（DemoPanel）`（为**进入**的场景预加载），
 > 紧接着步骤 7 释放**离开**的场景 → `ReleaseScene → DisposeScenePanels()` → **无差别**销毁所有非全局面板 →
 > **刚为进入场景预加载的面板被白白销毁**（实测 `IsCached(DemoPanel) = false`，且其预制体句柄也一并释放，导致随后的同步 `Open<DemoPanel>()` 也失败）。
-> 根因：`DisposeScenePanels()` 不看场景归属。下面这条规则正好修它。
+> 根因：`DisposeScenePanels()` 不看场景归属。
+
+**当前实现**：
 
 ```
-SurvivesScene(entering) = IsGlobal || SceneTags 为空 || SceneTags.Contains(entering)
+SurvivesScene(definition, entering) = definition == null            // 定义缺失 → 不销毁
+                                   || IsGlobal                      // SceneTags 为空 = 所有场景通用
+                                   || string.IsNullOrEmpty(entering) // 拿不到目标场景 → 不销毁（保守）
+                                   || SceneTags.Contains(entering)
 ```
-- 沿用「阶段 B」：**`IsGlobal` 改为只读属性 `SceneTags.Count == 0`**（删除字段），彻底消除「`IsGlobal=true` 却填了 `SceneTags`」的自相矛盾配置。
-- `DisposeScenePanels(enteringScene)` **改为带参**：判据用「**进入的场景**」，不能用 `ActiveSceneName`（Additive 过渡期它还是旧场景 —— 同一个坑 `CheckSceneTag` 的注释里已记录）。
-- 被销毁的面板若在栈内 → 从栈中剔除 + 重建模态 + 触发事件。
+- **阶段 B 已落地**：`IsGlobal` 改为只读属性 `SceneTags == null || SceneTags.Count == 0`（字段已删），彻底消除「`IsGlobal=true` 却填了 `SceneTags`」的自相矛盾配置；`CheckSceneTag` 里原先那句 `if (IsGlobal) return true;` 因此成为死代码，已删。
+- `IUIService.DisposeScenePanels(string enteringScene)` **已改带参**：判据用「**进入的场景**」，不能用 `ActiveSceneName`（Additive 过渡期它还是旧场景 —— 同一个坑 `CheckSceneTag` 的注释里已记录）。
+- `ISceneFlowHooks.SceneResourceRelease(resolver, leavingScene, enteringScene)`：为把目标场景名送到钩子，**改了签名**（4 处调用点同步）。
+- 被销毁的面板若在栈内 → 由 `PopupService.Prune()` 从栈中剔除 + 重建模态（每次查询/入栈/场景卸载时都会跑）。
+- **回归覆盖**：`UIServiceTests.DisposeScenePanels_KeepsGlobalAndEnteringScenePanels_DestroysOthers`（服务层）、
+  `SceneFlowTests.SceneResourceRelease_DisposesLeavingScenePanels_ButKeepsGlobalAndEnteringScenePanels`（钩子层）。
+- 顺带清理：删游离资产 `Game/UIPanelConfig.asset`（未被 `UIConfigAsset` 引用）；`LoadingPanelConfig.sceneTags` 清空（原为 `isGlobal=1` + `sceneTags=[LoadingScene]`，标签是死配置）。
 
 ### 5.4 串行队列（⑥b）
 - `PushAsync` 入队；一次只处理一个；`TaskCompletionSource` 回传。
@@ -207,7 +216,7 @@ Play 验收：两个 Popup 叠加 + 一个 Toast；验证点击命中（嵌套 C
 |---|---|---|---|
 | **1 基础 + 排序原语** | `UIRootCreator` 补 `overrideSorting`；`PanelDefinition.Priority/IsModal`；`PanelFactory` 挂排序句柄（`Canvas(overrideSorting)` + `GraphicRaycaster`）；`UIService` 打开时应用排序（降级安全）；配置 SO 接线 | 现有 12 例全绿 + 排序新例；Play 视觉不回归 | ✅ 76 例绿 + Play 验证 |
 | **2 栈 + 模态 + 队列** | `IPopupService`/`PopupService`、全局栈、共享 blocker、`(Priority, 打开序)`、异步串行队列、场景联动 | `PopupServiceTests` 全绿 + Play 双向验证 | ✅ 87 例绿 + Play 验证（遮罩/排序/点击命中）；**「可取消 + 超时」未做** |
-| **3 收尾** | `SceneTags` 阶段 B（删 `IsGlobal` 字段）、删游离资产 `Game/UIPanelConfig.asset`、清 `LoadingPanelConfig.sceneTags`、`DisposeScenePanels(enteringScene)` 修「预加载面板被误删」、文档 | 全量测试 + 文档 | ⬜ 待办 |
+| **3 收尾** | `SceneTags` 阶段 B（删 `IsGlobal` 字段）、删游离资产 `Game/UIPanelConfig.asset`、清 `LoadingPanelConfig.sceneTags`、`DisposeScenePanels(enteringScene)` 修「预加载面板被误删」、文档 | 全量测试 + 文档 | ✅ 89 例绿；`SceneResourceRelease` 签名已加 `enteringScene` |
 
 ---
 
@@ -215,6 +224,8 @@ Play 验收：两个 Popup 叠加 + 一个 Toast；验证点击命中（嵌套 C
 
 1. ~~**嵌套 `overrideSorting` 三层**~~（UIRoot → 层 Canvas → 面板 Canvas）：**已实测通过**。关键约束是「先挂父级、再 override、再 order」，见 §3。
 2. ~~**嵌套 Canvas 的点击命中**~~：**已实测确认**需要自带 `GraphicRaycaster`，且遮罩确实能拦住下层面板，见 §7。
-3. **`SceneTags` 语义三合一**（打开校验 + 预加载筛选 + 销毁判定）：一个面板若误填标签，会同时「打不开 + 被销毁」，需在文档与编辑器侧提示（阶段 3 处理）。
+3. **`SceneTags` 语义三合一**（打开校验 + 预加载筛选 + 销毁判定）：一个面板若误填标签，会同时「打不开 + 被销毁」。
+   阶段 B 已把「无标签 = 全局」定为唯一真相（删掉了会打架的 `isGlobal` 字段）；
+   编辑器侧目前**只能靠 `UIPanelConfigSO.sceneTags` 的 Tooltip 提示**，没有硬校验 —— 若以后误配变多，可加重合/拼写校验。
 4. **`Priority` 与 `PanelLayer` 的关系**：**层优先**，`Priority` 只在层内生效；要跨层必须靠 §3 的排序空间（已支持）。
 5. **异步队列的取消/超时未实现**（阶段 2 遗留）：当前 `PushAsync` 只保证「调用顺序 = 栈顺序」，入队后无法取消；`Pop`/`PopAll`/场景切换不会作废待处理项。已在 `PopupService` 类注释中标注。

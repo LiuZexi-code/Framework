@@ -35,7 +35,15 @@ namespace Framework.Abstractions.UI
         void CloseAll();
         T Get<T>() where T : class, IUIPanel;
 
-        // 场景容器销毁时清理 PerScene 面板
-        void DisposeScenePanels();
+        // 场景容器销毁时清理「不属于新场景」的面板
+        /// <summary>
+        /// 场景退出时清理面板实例。
+        /// <para>
+        /// <paramref name="enteringScene"/> 是**即将进入**的场景名，**必须传**：
+        /// 判据是「不属于新场景的实例才销毁」（为进入场景预加载的面板要保留）。
+        /// 不要用 <c>ISceneService.ActiveSceneName</c> —— 切换过程中它还是旧场景。
+        /// </para>
+        /// </summary>
+        void DisposeScenePanels(string enteringScene);
     }
 }

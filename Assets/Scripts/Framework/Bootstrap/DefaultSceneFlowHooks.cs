@@ -37,11 +37,12 @@ namespace Framework.Bootstrap
             yield return LoadPipeline.Run(steps, context, (stage, progress) => reportProgress?.Invoke(progress));
         }
 
-        public void SceneResourceRelease(IServiceResolver r, string sceneName)
+        public void SceneResourceRelease(IServiceResolver r, string leavingScene, string enteringScene)
         {
-            // 场景退出：销毁所有非全局（PerScene）面板实例，避免跨场景残留
+            // 场景退出：销毁「不属于新场景」的面板实例（全局 + 标签命中新场景的实例保留）。
+            // ⚠ 必须把**进入的场景**一并传下去：为进入场景预加载的面板不能被这一步销毁。
             if (r != null && r.TryResolve(out IUIService uiService))
-                uiService.DisposeScenePanels();
+                uiService.DisposeScenePanels(enteringScene);
         }
 
         public IEnumerator OnLoadingBegin(IServiceResolver r, string target)
