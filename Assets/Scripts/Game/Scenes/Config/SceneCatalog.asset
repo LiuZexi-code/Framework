@@ -12,11 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fef5ddb399dbd9e4d93443ace9ece077, type: 3}
   m_Name: SceneCatalog
   m_EditorClassIdentifier: 
-  entrySceneName: SampleScene
+  entrySceneName: RPGScene
   loadingSceneName: LoadingScene
   transitionPolicy: 1
+  registration: 0
   strict: 0
   scenes:
   - {fileID: 11400000, guid: 2913e5ec9ebea1a44b6dc4ec41525e0e, type: 2}
   - {fileID: 11400000, guid: 099c5490071170d46b889b7048d48111, type: 2}
   - {fileID: 11400000, guid: 6b5a5c1350336644b81cf03c4109f2b9, type: 2}
+  - {fileID: 11400000, guid: 68080a015f3361f49846b640ef19ebc0, type: 2}

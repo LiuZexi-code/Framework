@@ -93,13 +93,13 @@
 | 10 | 场景流 `SceneFlow` | 🟢 可用 | 85% | 加载→激活→切 ActiveScene→卸载旧场景 已验证；已加「目标场景已加载则复用」防重复加载；**5%→30% 跑场景预加载管线**；**切换前静音旧场景监听器**、**过渡期关闭旧场景灯光**、**启动未完成时拒绝切换**；**切换策略由全局 `SceneTransitionPolicy` 统一驱动**（P8，2026-10-12） |
 | 11 | 模块化扩展点 `IServiceModule` | ✅ 完成 | 90% | `ServiceModuleRegistry` + `CoreServiceModule` + 场景模块已落地并验证；**新增“加载步骤提供者”发现**（2026-10-12） |
 | 12 | 启动装配 `MyBootstrapRunner` | ✅ 完成 | 95% | **框架内置通用引导流程**`BootstrapRunner`；业务层只需「提供者」类（2026-10-12） |
-| 13 | 示例内容（场景/预制/面板） | 🟢 可用 | 60% | Loading 面板可用；EventSystem 与**中文字体**（`Fonts/CNFont SDF.asset`）已接入（2026-10-12）；入口场景已有 `SampleScene` + `Level2`（A→B→A 切换演示，2026-10-12） |
+| 13 | 示例内容（场景/预制/面板） | 🟢 可用 | 75% | Loading 面板可用；EventSystem 与**中文字体**（`Fonts/CNFont SDF.asset`）已接入；切换演示已有 `SampleScene` + `Level2`（2026-10-12）；**RPG demo 支线 `RPGScene`（A1–A5：输入重绑 / 关卡与 Layer / Cinemachine 相机 / 点击移动 / 交互系统）已可玩**，装配走编辑器工具 `RpgSceneWirer`（2026-10-13） |
 | 14 | 分层与命名规范 | ✅ 完成 | 95% | 多余引用/命名空间/拼写/全局命名空间均已收口（仅 `LoadingDots`/`ProgressBar` 留在 Assembly-CSharp） |
-| 15 | 测试 | 🟢 良好 | 97% | **127 例 EditMode + 3 例 PlayMode 全绿**；覆盖四条切换策略、Single 经 Loading 场景、句柄释放、层排序/弹窗栈、UI 上下文自动切换、输入值类型路由与真实输入回归 |
+| 15 | 测试 | 🟢 良好 | 97% | **158 例 EditMode + 10 例 PlayMode 全绿**；覆盖四条切换策略、Single 经 Loading 场景、句柄释放、层排序/弹窗栈、UI 上下文自动切换、输入值类型路由与真实输入回归、音频音量语义、交互状态机、NavMesh 寻路 |
 | 16 | 文档 | 🟢 有 | 90% | 本节所在文件 + 根目录 `README.md`（**5 分钟接入指南**）+ `SCENE_CONFIG_DESIGN.md` + `UI_POPUP_DESIGN.md` + `INPUT_DESIGN.md` |
 | 17 | 输入服务 `IInputService` | ✅ 完成 | 90% | 契约（Abstractions）/实现（Adapters：`InputService` + `NullInputBackend` + `InputSystemBackend` + `MockInputService`）+ 项目层接入；**无 tick**（InputSystem 自身更新在逻辑 Update 之前）；剩余：Legacy 后端、多玩家设备分配（见 `INPUT_DESIGN.md` §13） |
 
-**整体成熟度估算：≈ 100%**（2026-10-12 输入服务落地后）。当前特征：「**框架可用、接入成本已实测、接入文档已交付、场景/UI/输入均配置驱动**」。剩余可选：CI（已暂停）、`ISceneFlow` 暴露生效策略、输入后置扩展（重绑定/输入缓冲/连招/录像/网络预测）。
+**整体成熟度估算：≈ 100%**（2026-10-12 输入服务落地后）。当前特征：「**框架可用、接入成本已实测、接入文档已交付、场景/UI/输入均配置驱动**」。剩余可选：CI（已暂停）、`ISceneFlow` 暴露生效策略、输入后置扩展（重绑定/输入缓冲/连招/录像/网络预测）。另：框架达标后新增 **RPG demo 支线**（入口场景 `RPGScene`；A1 输入重绑 → A2 关卡/Layer → A3 Cinemachine 相机 → A4 点击移动 → A5 交互系统，2026-10-13 已可玩；场景装配工具 `RpgSceneWirer`，菜单 `Tools/我的工具/RPG/*`）。
 
 > ✅ **里程碑 M1「最小可运行」已达成（2026-10-11）**
 > 链路 `FrameworkStartEntry → MyGameRoot → MyBootstrapRunner → 配置加载 → SceneFlow → 入口场景容器` 全链路跑通，控制台无异常；

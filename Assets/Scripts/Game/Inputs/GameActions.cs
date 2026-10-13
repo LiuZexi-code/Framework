@@ -35,12 +35,27 @@ namespace Game.Inputs
         }
 
         // ---------- Gameplay ----------
-        public const string Move = "Move";
-        public const string Jump = "Jump";
-        public const string Attack = "Attack";
+
+        /// <summary>统一点击指令：点地面=移动，点物品/NPC/敌人=前往并交互。</summary>
+        public const string Click = "Click";
+
+        /// <summary>执行当前交互（HUD 交互按钮的快捷键）。</summary>
+        public const string Interact = "Interact";
+
+        /// <summary>相机水平环绕（A 负 / D 正；只转相机，不改角色朝向）。</summary>
+        public const string CameraRotate = "CameraRotate";
+
+        /// <summary>相机缩放（滚轮）。</summary>
+        public const string Zoom = "Zoom";
+
+        /// <summary>指针屏幕坐标（Vector2，像素）：交互与光标的世界射线都靠它。</summary>
+        public const string PointerPosition = "PointerPosition";
+
+        /// <summary>暂停（打开设置面板）。</summary>
         public const string Pause = "Pause";
 
         // ---------- UI ----------
+
         public const string Cancel = "Cancel";
     }
 }

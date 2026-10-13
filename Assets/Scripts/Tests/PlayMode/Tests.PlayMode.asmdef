@@ -9,7 +9,8 @@
         "Adapters",
         "Bootstrap",
         "Game",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "Unity.AI.Navigation"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

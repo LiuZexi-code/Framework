@@ -80,6 +80,11 @@ MonoBehaviour:
     m_SerializedLabels:
     - Enemy
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fd0bebb06dd68de48b4179a966d8731f
+    m_Address: RPGScene
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: de5ab3874c0c3d446b8b00a91eb1b12b, type: 2}
   m_SchemaSet:
