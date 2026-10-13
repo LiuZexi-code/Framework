@@ -6,7 +6,7 @@ using Framework.Abstractions.UI;
 using Framework.Adapters.Config;
 using Framework.Adapters.Logging;
 using Framework.UI;
-using Game.UI.Config;
+using Game.RPG.UI.Config;
 
 namespace Game.Bootstrap
 {

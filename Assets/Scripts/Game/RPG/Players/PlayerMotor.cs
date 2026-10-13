@@ -125,6 +125,21 @@ namespace Game.RPG.Players
             return agent.Warp(hit.position);
         }
 
+        /// <summary>
+        /// 该世界点是否「走得到」（**只做 NavMesh 采样，不移动**）。
+        /// <para>
+        /// 与 <see cref="TryMoveTo"/> 共用 <c>sampleMaxDistance</c> —— 保证「光标提示可达」与「真的能走过去」
+        /// 是同一套判据，不会出现「光标说能走、一点击却失败」的不一致。
+        /// </para>
+        /// </summary>
+        public bool IsReachable(Vector3 worldPoint)
+        {
+            if (agent == null || !agent.enabled) return false;
+
+            NavMeshHit hit;
+            return NavMesh.SamplePosition(worldPoint, out hit, sampleMaxDistance, NavMesh.AllAreas);
+        }
+
         /// <summary>是否已到达当前目标点。</summary>
         public bool HasArrived()
         {

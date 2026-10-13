@@ -40,6 +40,9 @@ public class InteractionServiceTests
             return true;
         }
 
+        /// <summary>可达性与「移动是否被拒」保持一致（替身只有这一个「走不过去」的概念）。</summary>
+        public bool IsReachable(Vector3 worldPoint) => !RejectMoves;
+
         public void Stop()
         {
             StopCalls++;

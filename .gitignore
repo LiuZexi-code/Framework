@@ -51,9 +51,34 @@
 /[Aa]ssets/[Ss]creenshots/
 /[Aa]ssets/[Ss]creenshots.meta
 
+# ---------- 版权 / 个人内容（不上传）----------
+# 方正小标宋为**商业字体**，需自行采购（见 README「字体自备」）；
+# 整个 Fonts 目录一并排除——字体文件与其生成的 TMP 字体资产（图集含字形位图）
+# 属同源版权材料，连 .meta 一起排除，避免克隆者拿到悬空 GUID。
+/[Aa]ssets/[Ff]onts/
+/[Aa]ssets/[Ff]onts.meta
+# 个人求职材料（简历技术总结）
+/RESUME_PROJECT_SUMMARY.md
+# ---------- 设计文档（仅本地，不提交上游）----------
+/INPUT_DESIGN.md
+/RPG_DEMO_DESIGN.md
+/SCENE_CONFIG_DESIGN.md
+/UI_POPUP_DESIGN.md
+/docs/
+
+# ---------- 本地生成 / 工具数据（不上传）----------
+# Addressables 的配置与分组（含组/地址/Schema）——本地生成，排除后克隆方需自行启用 Addressables
+/[Aa]ssets/[Aa]ddressableAssetsData/
+/[Aa]ssets/[Aa]ddressableAssetsData.meta
+# ProBuilder 的调色板等本地数据
+/[Aa]ssets/[Pp]roBuilder [Dd]ata/
+/[Aa]ssets/[Pp]roBuilder [Dd]ata.meta
+# TextMesh Pro 必需资源（默认字体/着色器/示例）——排除后克隆方需 Import TMP Essential Resources
+/[Aa]ssets/TextMesh Pro/
+/[Aa]ssets/TextMesh Pro.meta
+
 # ---------- IDE / 编辑器 ----------
-# 注：.vscode/ 由 Unity 的 VS Code 集成包生成、不含本机路径，故**提交**；
-#     Assets/ProBuilder Data/ 里有 ProBuilder 的调色板资产，也**提交**。
+# 注：.vscode/ 由 Unity 的 VS Code 集成包生成、不含本机路径，故**提交**。
 .idea/
 .vs/
 

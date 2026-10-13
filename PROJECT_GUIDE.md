@@ -12,25 +12,26 @@
 | 启动流程 / 装配（框架通用） | `Assets/Scripts/Framework/Bootstrap/BootstrapRunner.cs`（含 `FrameworkStartEntry` / `BootstrapOptions` / `LoadStepCollector`） |
 | **加载步骤（启动 / 场景预加载）** | `Assets/Scripts/Framework/Abstractions/Loading/**`；业务实现 `IStartupLoadStepProvider` / `ISceneLoadStepProvider` |
 | **引导参数（入口/Loading 场景名）** | 实现 `IBootstrapOptionsProvider`；示例 `Assets/Scripts/Game/Bootstrap/GameBootstrapOptions.cs` |
-| **5 分钟接入指南（新工程从零接入）** | **根目录 `README.md`** |
+| **项目概览 / 进度 / 5 分钟接入指南** | **根目录 `README.md`**（文首含全量文档索引） |
+| **踩坑清单 / 启动自检 / 中文字体** | `docs/PITFALLS.md`、`docs/STARTUP_LOG.md`、`docs/FONTS.md` |
 | 服务模块扫描与注册 | `Assets/Scripts/Framework/Bootstrap/Modules/ServiceModuleRegistry.cs` |
 | **新增配置（零改动）** | 实现 `IConfigFactory` 放 `Game` 程序集（框架自动发现）；示例 `Assets/Scripts/Game/Config/DemoTuningConfig.cs` |
 | 配置自动发现逻辑 | `Assets/Scripts/Framework/Bootstrap/GameConfigRegistry.cs` |
-| UI 缩放（分辨率/匹配模式） | `Assets/Scripts/Framework/Abstractions/UI/UISettings.cs`（业务在 `MyBootstrapRunner` 用 UI 配置写入） |
+| UI 缩放（分辨率/匹配模式） | `Assets/Scripts/Framework/Abstractions/UI/UISettings.cs`（业务在 `UIPanelSetupStep` 用 UI 配置写入） |
 | 模块契约（扩展点） | `Assets/Scripts/Framework/Abstractions/Modules/IServiceModule.cs` |
 | 框架内置服务（新增/替换实现） | `Assets/Scripts/Framework/Adapters/Modules/CoreServiceModule.cs` |
 | 业务扩展模块（示例） | `Assets/Scripts/Game/Modules/DemoGlobalModule.cs` |
 | 单元测试 | `Assets/Scripts/Tests/ServiceCollectionTests.cs` |
-| 框架启动入口（自动建 GameRoot） | `Assets/Scripts/Game/FrameworkStartEntry.cs` |
+| 框架启动入口（自动建 GameRoot） | `Assets/Scripts/Framework/Bootstrap/FrameworkStartEntry.cs` |
 | 场景切换 / Loading 流程 | `Assets/Scripts/Framework/Bootstrap/SceneFlow.cs` |
-| 场景钩子（加载中做什么） | `Assets/Scripts/Framework/Bootstrap/MySceneFlowHook.cs` |
+| 场景钩子（加载中做什么） | `Assets/Scripts/Framework/Bootstrap/DefaultSceneFlowHooks.cs` |
 | DI 容器本体 | `Assets/Scripts/Framework/Core/ServiceCollection.cs` |
 | 服务接口定义 | `Assets/Scripts/Framework/Abstractions/**` |
 | 服务具体实现 | `Assets/Scripts/Framework/Adapters/**` |
 | UI 管理 / 面板工厂 | `Assets/Scripts/Framework/Adapters/UI/UIService.cs`、`PanelFactory.cs` |
 | UI 面板基类 | `Assets/Scripts/Framework/Adapters/UI/UIPanelBase.cs` |
-| UI 配置资产 | `Assets/Scripts/Game/UI/Config/UIConfigAsset.asset` |
-| 业务面板 | `Assets/Scripts/Game/UI/` |
+| UI 配置资产 | `Assets/Scripts/Game/RPG/UI/Config/UIConfigAsset.asset` |
+| 业务面板 | `Assets/Scripts/Game/RPG/UI/` |
 | 资源地址表 | Addressables 面板 → `Default Local Group` |
 
 ---
@@ -92,11 +93,11 @@
 | 9 | UI `UIService`/`PanelFactory`/`UIRoot` | 🟢 可用 | 90% | 全链路已验证；`UIRootCreator` 已自动建 EventSystem；缩放参数由 UI 配置驱动；`SceneTags`/`loadPolicy` 已参与**预加载筛选**与**打开时校验**（2026-10-12）；**弹窗栈/模态/层内优先级/串行队列 + 取消与超时已实现**（2026-10-12）；**面板打开/关闭自动 Push/Pop 输入上下文**（2026-10-12） |
 | 10 | 场景流 `SceneFlow` | 🟢 可用 | 85% | 加载→激活→切 ActiveScene→卸载旧场景 已验证；已加「目标场景已加载则复用」防重复加载；**5%→30% 跑场景预加载管线**；**切换前静音旧场景监听器**、**过渡期关闭旧场景灯光**、**启动未完成时拒绝切换**；**切换策略由全局 `SceneTransitionPolicy` 统一驱动**（P8，2026-10-12） |
 | 11 | 模块化扩展点 `IServiceModule` | ✅ 完成 | 90% | `ServiceModuleRegistry` + `CoreServiceModule` + 场景模块已落地并验证；**新增“加载步骤提供者”发现**（2026-10-12） |
-| 12 | 启动装配 `MyBootstrapRunner` | ✅ 完成 | 95% | **框架内置通用引导流程**`BootstrapRunner`；业务层只需「提供者」类（2026-10-12） |
-| 13 | 示例内容（场景/预制/面板） | 🟢 可用 | 75% | Loading 面板可用；EventSystem 与**中文字体**（`Fonts/CNFont SDF.asset`）已接入；切换演示已有 `SampleScene` + `Level2`（2026-10-12）；**RPG demo 支线 `RPGScene`（A1–A5：输入重绑 / 关卡与 Layer / Cinemachine 相机 / 点击移动 / 交互系统）已可玩**，装配走编辑器工具 `RpgSceneWirer`（2026-10-13） |
+| 12 | 启动装配 `BootstrapRunner` | ✅ 完成 | 95% | **框架内置通用引导流程**；业务层只需「提供者」类（2026-10-12） |
+| 13 | 示例内容（场景/预制/面板） | 🟢 可用 | 80% | Loading 面板可用；EventSystem 与**中文字体**（`Fonts/CNFont SDF.asset`）已接入；切换演示已有 `SampleScene` + `Level2`（2026-10-12）；**RPG demo 支线 `RPGScene`（A1–A6：输入重绑 / 关卡与 Layer / Cinemachine 相机 / 点击移动 / 交互系统 / 软件光标）已可玩**，装配走编辑器工具 `RpgSceneWirer`（2026-10-13）；设计基准 `RPG_DEMO_DESIGN.md` |
 | 14 | 分层与命名规范 | ✅ 完成 | 95% | 多余引用/命名空间/拼写/全局命名空间均已收口（仅 `LoadingDots`/`ProgressBar` 留在 Assembly-CSharp） |
-| 15 | 测试 | 🟢 良好 | 97% | **158 例 EditMode + 10 例 PlayMode 全绿**；覆盖四条切换策略、Single 经 Loading 场景、句柄释放、层排序/弹窗栈、UI 上下文自动切换、输入值类型路由与真实输入回归、音频音量语义、交互状态机、NavMesh 寻路 |
-| 16 | 文档 | 🟢 有 | 90% | 本节所在文件 + 根目录 `README.md`（**5 分钟接入指南**）+ `SCENE_CONFIG_DESIGN.md` + `UI_POPUP_DESIGN.md` + `INPUT_DESIGN.md` |
+| 15 | 测试 | 🟢 良好 | 97% | **167 例 EditMode + 10 例 PlayMode 全绿**（源码统计，合计 177）；覆盖四条切换策略、Single 经 Loading 场景、句柄释放、层排序/弹窗栈、UI 上下文自动切换、输入值类型路由与真实输入回归、音频音量语义、交互状态机、NavMesh 寻路、软件光标状态映射 |
+| 16 | 文档 | 🟢 有 | 92% | 本节所在文件 + 根目录 `README.md`（**概览 / 进度 / 5 分钟接入指南**，文首含全量索引）+ `SCENE_CONFIG_DESIGN.md` + `UI_POPUP_DESIGN.md` + `INPUT_DESIGN.md` + `RPG_DEMO_DESIGN.md` + `docs/{PITFALLS,STARTUP_LOG,FONTS}.md` |
 | 17 | 输入服务 `IInputService` | ✅ 完成 | 90% | 契约（Abstractions）/实现（Adapters：`InputService` + `NullInputBackend` + `InputSystemBackend` + `MockInputService`）+ 项目层接入；**无 tick**（InputSystem 自身更新在逻辑 Update 之前）；剩余：Legacy 后端、多玩家设备分配（见 `INPUT_DESIGN.md` §13） |
 
 **整体成熟度估算：≈ 100%**（2026-10-12 输入服务落地后）。当前特征：「**框架可用、接入成本已实测、接入文档已交付、场景/UI/输入均配置驱动**」。剩余可选：CI（已暂停）、`ISceneFlow` 暴露生效策略、输入后置扩展（重绑定/输入缓冲/连招/录像/网络预测）。另：框架达标后新增 **RPG demo 支线**（入口场景 `RPGScene`；A1 输入重绑 → A2 关卡/Layer → A3 Cinemachine 相机 → A4 点击移动 → A5 交互系统，2026-10-13 已可玩；场景装配工具 `RpgSceneWirer`，菜单 `Tools/我的工具/RPG/*`）。
@@ -145,6 +146,8 @@
 > ✅ **验证状态（2026-10-12）**：**70 例 EditMode 全绿**；Play 实测 `SampleScene →(ThroughLoadingScene)→ Level2` 与入口切换均日志 `过渡：加载 Loading 场景（关闭旧场景 …）→ [Scene] Addressables 加载：LoadingScene（Single）→ …：目标（Single）→ 切换完成：X（已加载场景：X）`，无 error。
 >
 > ✅ **P8 切换策略收敛（2026-10-12，用户提案）**：把「每条场景的 `loadMode`」与「全局 `swapPolicy`」**合并为单一枚举** `SceneTransitionPolicy`（2×2 矩阵）：`SingleDirect`（默认，直接 Single）/ `ThroughLoadingScene`（A→Loading→B）/ `Additive`（逃生舱，支持常驻/子场景）/ `AdditiveUnloadFirst`（先卸后载）。`SceneConfigSO.loadMode` 已删除；`SceneConfigAssetSO.swapPolicy` → `transitionPolicy`。**Single 系下自动跳过共存补丁**（`MuteAudioListeners`/`DisableLightsOf`）。**安全阀**：策略为 Single 系但存在 `persistent` 场景 → 告警 + 自动改用 `Additive`。`LoadingScene` 已配 `LoadingCamera`。**70 例全绿 + Play 双向验证**。
+>
+> ✅ **文档结构重整（2026-10-13）**：根目录 `README.md` 重构为 GitHub 通用结构 —— 标题/信息表 → **文档索引** → **特性** → **项目进度**（框架 M1–M4 + P0–P9、RPG Demo A1–A6 完成 / A7 + I·B·S·C 待做 / 质量基线）→ **快速开始** → §1 接入 → §2 四条接入路径（**编号保持不变**，`§1.3` / `§2.8` 等交叉引用不受影响）→ §3 API → §4 目录（新增 Mermaid 依赖图）→ §5 踩坑（仅留指针）→ §6 更多。移出三块内容到 `docs/`：`docs/PITFALLS.md`（29 条踩坑，**编号 1–29 保持稳定**）、`docs/STARTUP_LOG.md`（启动自检日志与判据）、`docs/FONTS.md`（中文字体自备）。同时校正过期数字：测试 **167 例 EditMode + 10 例 PlayMode**（源码统计）、`InputDemo` 已删、目录树补 `Game/RPG` 与输入/音频目录。
 
 ### 关键路径（从现在 → 完成）
 
@@ -276,6 +279,7 @@ graph TD
 ### 3.4 `Assets/Scripts/Framework/Bootstrap` —— 启动与场景流
 - `GameRoot.cs` —— `[DefaultExecutionOrder(-10000)]`；`Awake` → `StartCoroutine(StartupRoutine)`；`CreateRunner()` 默认反射发现业务的 `IBootstrapRunner`，找不到则用 `BootstrapRunner`。
 - `FrameworkStartEntry.cs` —— **框架启动入口**（2026-10-12 从 Game 层迁入）：`RuntimeInitializeOnLoadMethod(BeforeSceneLoad)` 自动建 `[GameFramework]` + `GameRoot`。
+  - **静态状态复位（2026-10-13）**：另有一个 `RuntimeInitializeOnLoadMethod(SubsystemRegistration)` 复位静态标志 —— 关闭「Enter Play Mode Options」的域重载后，静态字段会跨 Play 残留，而根节点退出 Play 即销毁，两者叠加会让**第二次 Play 静默不启动**。`Bootstrap()` 另加「根节点不存在就必须重新装配」的双保险；`GameRoot.Dispose` 复位 `_instance`、`SceneFlow.Dispose` 清空 `ServiceLocator`（容器已释放，不能再解析到已销毁的服务）。
 - `BootstrapRunner.cs` —— **框架通用引导流程**（2026-10-12 新增）：模块 → 日志 → 启动加载管线 → `SceneFlow` → 常驻 Loading 场景 → 入口场景；含可覆写钩子（`CreateOptions` / `CollectStartupSteps` / `CreateHooks` / `OnStartupCompleted` / `OnStartupProgress`）与静态发现入口 `CreateDefault()`。
 - `BootstrapOptions.cs` —— 引导参数（`EntrySceneName` / `LoadingSceneName` / `ScanPrefixes`）与 `IBootstrapOptionsProvider`（业务提供，反射发现）。
 - `LoadStepCollector.cs` —— **加载步骤收集器**：定义内置步骤（启动：预热配置→加载配置；场景：按 `loadPolicy` 预加载面板 → **按场景配置预加载专属资源**（2026-10-12））并反射发现 `ILoadStepProvider`。
@@ -292,14 +296,14 @@ graph TD
 - `Bootstrap/UIPanelSetupStep.cs` —— **启动步骤**：应用 UI 配置（分辨率/匹配）并注册全部面板（原先写在 `MyBootstrapRunner` 里）。
 - （已删除 `FrameworkStartEntry.cs` / `MyGameRoot.cs` / `MyBootstrapRunner.cs`：已收进框架，业务层不再需要。）
 - （已删除 `Bootstrap/DemoScenePreloadStep.cs`：2026-10-12 —— 场景专属预加载已改为**配置驱动**，见 `Scenes/Config/` + 内置步骤 `PreloadSceneAddressesStep`。）
-- `UI/Config/DemoPanelConfig.asset` —— DemoPanel 的配置条目：`sceneTags=[SampleScene]` + `loadPolicy=Preload`（演示**预加载筛选**与**打开校验**）；`inputContextId=UI` / `inputContextPriority=100`（2026-10-12：打开面板**自动阻断玩法输入**，关闭/被销毁自动恢复）。
+- `RPG/UI/Config/DemoPanelConfig.asset` —— DemoPanel 的配置条目：`sceneTags=[SampleScene]` + `loadPolicy=Preload`（演示**预加载筛选**与**打开校验**）；`inputContextId=UI` / `inputContextPriority=100`（2026-10-12：打开面板**自动阻断玩法输入**，关闭/被销毁自动恢复）。
 - `Inputs/` —— **输入接入**（2026-10-12）：`GameActions`（动作/上下文常量）、`GameInputModule`（`Order=100` 覆盖后端为 `InputSystemBackend`）、`GameInputAssetStepProvider`（启动管线里载入 `InputActionAsset` 并 `Attach`）、`InputDemo`（**事件驱动**演示 Push/Pop 上下文）、`GameInputActions.inputactions`（`Gameplay`/`UI` 两个 ActionMap）。设计稿 `INPUT_DESIGN.md`。
 - `Modules/GameSceneServiceModule.cs` —— **示例：把场景服务切为 Addressables 版**（`Order=0` 覆盖框架默认）。
 - `Config/DemoTuningConfig.cs` —— **示例配置**：纯代码配置 + `IConfigFactory`，演示“加配置不改启动代码”。
 - `Modules/DemoGlobalModule.cs` —— **示例模块**：同时实现全局/场景服务注册，演示“加服务不改框架”。
-- `UI/LoadingPanel.cs` —— Loading 面板：`Game.UI.LoadingPanel : UIPanelBase, ILoadingPanel`。
+- `RPG/UI/LoadingPanel.cs` —— Loading 面板：`Game.RPG.UI.LoadingPanel : UIPanelBase, ILoadingPanel`。
 - （已删除未引用的空模板 `PlayerController.cs` / `Services/NewBehaviourScript.cs`。）
-- `UI/Config/` —— `UIConfigAssetSO`、`UIPanelConfigSO`、`UIConfigAsset.asset`、`UIConfigFactory`。
+- `RPG/UI/Config/` —— `UIConfigAssetSO`、`UIPanelConfigSO`、`UIConfigAsset.asset`、`UIConfigFactory`。
 - （已删除 `UIPanelConfig.asset`：2026-10-12 —— 未被 `UIConfigAsset` 引用且字段与现模型不符的遗留资产。）
 - `Bootstrap/SceneCatalogSetupStep.cs` —— **场景配置步骤**（2026-10-12）：把 `SceneConfigAssetSO` 转成运行期 `ISceneCatalog` + 启动期校验（设计稿 §6）。
 - `Scenes/Config/` —— **场景配置**（2026-10-12）：`SceneConfigSO`（单项）、`SceneConfigAssetSO`（总表 + `SceneRegistration`）、`SceneConfigFactory`、`SceneConfigValidation`、`SceneCatalog.asset`。用法与字段见 `SCENE_CONFIG_DESIGN.md`。
@@ -318,7 +322,7 @@ graph TD
 - `InputSystemBackendTests.cs` —— **EditMode 测试（8 例）**：内存 `InputActionAsset`；Attach/HasAsset、**值类型路由判据**、Button 查询、未知动作、上下文阻断（`ActiveActionCount`/`EnabledMapNames`）、`contextId→map` 重命名、`Attach(null)` 安全、`Dispose` 幂等。
 - `Tests/PlayMode/InputSystemBackendPlayModeTests.cs` —— **PlayMode 测试（3 例，程序集 `Tests.PlayMode`，非 Editor-only）**：合成手柄 + `ProcessEventsManually` 注入真实输入；`ReadVector2` 读到真实值、**`ReadAxis` 对向量动作不抛异常**（那个只能在 Play 复现的 bug 的真回归）、上下文阻断→归零→恢复、按钮触发 `ActionTriggered`。
   - ⚠️ `GamepadButton` 是**顺序枚举**（`South==6`，不是位标志）→ 造状态必须用 `GamepadState.WithButton(...)`；`MouseState.buttons` 才是位域。
-- （`Tests.asmdef` 已设为 `"includePlatforms": ["Editor"]`，并新增对 `Game`、`Unity.InputSystem` 的引用；现有 **127 例** EditMode + **3 例** PlayMode 全绿。）
+- （`Tests.asmdef` 已设为 `"includePlatforms": ["Editor"]`，并新增对 `Game`、`Unity.InputSystem` 的引用；现有 **167 例** EditMode + **10 例** PlayMode 全绿。）
 - `SceneCatalogTests.cs` —— **EditMode 测试（5 例）**：登记/查询/同名覆盖/空名防护/默认宽松策略。
 - `SceneConfigTests.cs` —— **EditMode 测试（9 例）**：SO → `SceneDefinition` 映射（含 `address` 回退、空名返回 null）+ 校验规则 V1–V7。
 
@@ -336,6 +340,7 @@ sequenceDiagram
     participant B as BootstrapRunner
     participant F as SceneFlow
     participant S as ISceneService
+    U->>E: RuntimeInitializeOnLoadMethod(SubsystemRegistration) → 复位静态状态（不依赖域重载）
     U->>E: RuntimeInitializeOnLoadMethod(BeforeSceneLoad)
     E->>R: new GameObject("[GameFramework]") + AddComponent
     R->>R: Awake() → StartCoroutine(StartupRoutine)
@@ -357,7 +362,7 @@ sequenceDiagram
 - `Attach()` 订阅 `ISceneService.SceneLoaded/SceneUnloaded`。
 - 每个已加载场景建一个 `ServiceCollection(_globalResolver)` 子容器；`ServiceLocator`/`SceneFlow.Current` 指向**最新**场景容器。
 - 卸载场景 → 销毁对应子容器；Loading 场景永不建容器、永不卸载。
-- `_hooks.RegisterSceneServices(container, sceneName)` 是场景级服务的注入口（当前 `MySceneFlowHooks` 是空实现）。
+- `_hooks.RegisterSceneServices(container, sceneName)` 是场景级服务的注入口（当前 `DefaultSceneFlowHooks` 已实现：场景模块注册 + 场景资源预加载 + 按场景归属清理面板）。
 
 ---
 
@@ -388,7 +393,7 @@ sequenceDiagram
   - 约束：模块需**公开无参构造**；同类型只注册一次；后注册者覆盖先注册者。
 - 框架内置：`Framework.Adapters.Modules.CoreServiceModule`（`Order=-1000`）。
 - 业务扩展：实现上述接口并置于 `Game` 程序集即可，**无需修改任何启动代码**（示例 `Game/Modules/DemoGlobalModule.cs`）。
-- 场景级：`MySceneFlowHooks.RegisterSceneServices` 已委托 `RegisterSceneModules`，每个场景建容器时自动注册。
+- 场景级：`DefaultSceneFlowHooks.RegisterSceneServices` 已委托 `RegisterSceneModules`，每个场景建容器时自动注册。
 
 ### 5.4 场景流 `SceneFlow`
 - `SwitchScene` 为 fire-and-forget；内部 `SwitchSceneRoutine` 分 9 步：显示 Loading → 资源预加载(0→30%) → Additive 加载 → 等 `IsPrepared`(30→90%) → `Activate()` → 等场景容器建立 → `SetActiveScene` → 卸载旧场景 → 隐藏 Loading。
@@ -412,7 +417,7 @@ sequenceDiagram
 
 ### 5.6 配置系统
 - `IGameConfig`（`ConfigId`/`LoadAddress`/`LoadOrder`/`IsPersistent`/`IsLoaded`/`Load`）→ `GameConfigBase` → `ConfigBySO<T>`（从 Addressables 加载 SO）。
-- `IConfigFactory.CreateConfig()` 是注册入口：`GameConfigRegistry.Discover()` 在启动时**自动发现**所有 `IConfigFactory`（需公开无参构造）并创建配置，**无需改启动代码**（示例 `Game/UI/Config/UIConfigFactory.cs`、`Game/Config/DemoTuningConfig.cs`）。
+- `IConfigFactory.CreateConfig()` 是注册入口：`GameConfigRegistry.Discover()` 在启动时**自动发现**所有 `IConfigFactory`（需公开无参构造）并创建配置，**无需改启动代码**（示例 `Game/RPG/UI/Config/UIConfigFactory.cs`、`Game/Config/DemoTuningConfig.cs`）。
 - `ConfigService`（`IGameConfigService`）：`Register`/`Get<T>`/`TryGet<T>`/`LoadAll`；`LoadAll` 按 `LoadOrder` 排序加载并触发 `OnConfigLoaded`。
 - `GameConfigBase(configId, loadOrder)`：`ConfigId` 缺省取实现类型名（`ConfigBySO<T>` 取 `typeof(T).Name`）；`ConfigService` 以 `config.GetType()` 为 key。
 
@@ -472,7 +477,7 @@ sequenceDiagram
 | `LoadingScene` | Scene | — | Loading 常驻场景 |
 | `SampleScene` | Scene | — | 示例入口场景（A） |
 | `Level2` | Scene | — | 示例第二场景（B）；与 `SampleScene` 互切演示 |
-| `Assets/Scripts/Game/UI/Config/UIConfigAsset.asset` | ScriptableObject | — | UI 配置资产（按**完整路径**作地址） |
+| `Assets/Scripts/Game/RPG/UI/Config/UIConfigAsset.asset` | ScriptableObject | — | UI 配置资产（按**完整路径**作地址） |
 | `Assets/Scripts/Game/Scenes/Config/SceneCatalog.asset` | ScriptableObject | — | **场景配置总表**（按完整路径作地址，2026-10-12） |
 | `UI/Loading` | Prefab | — | Loading 面板预制体（`LoadingPanel`） |
 | `Input/GameInputActions` | **`.inputactions`** | — | **输入绑定资产**（`Gameplay` = Move/Jump/Attack/Pause；`UI` = Cancel，2026-10-12） |
@@ -550,7 +555,7 @@ sequenceDiagram
 - ✅ `PanelTypeRegistry.Scan()` 已在启动时调用（面板由 `UIConfigAsset` 驱动注册）。
 - ✅ `UIConfigFactory` 已接线：`GameConfigRegistry.Discover()` 自动发现所有 `IConfigFactory` 并注册（2026-10-12；实测「新增配置不改启动代码」）。
 - ✅ `ISceneService` 的 Addressables 实现已落地（`AddressablesSceneService`，2026-10-12）；业务可由模块覆盖默认实现（示例 `Game/Modules/GameSceneServiceModule.cs`）。
-- ✅ 已有 **127 例** EditMode 测试 + **3 例** PlayMode 测试（`Tests.PlayMode`）；含场景级集成测试、四条切换策略覆盖、层排序/弹窗队列、UI 上下文自动切换、输入值类型路由与真实输入回归。
+- ✅ 已有 **167 例** EditMode 测试 + **10 例** PlayMode 测试（`Tests.PlayMode`）；含场景级集成测试、四条切换策略覆盖、层排序/弹窗队列、UI 上下文自动切换、输入值类型路由与真实输入回归、音频音量语义、交互状态机、NavMesh 寻路、软件光标状态映射。
 - ⬜ 无 CI（`.github/workflows/ci.yml` 已移除，用户暂停）。
 
 ### F. 本轮新发现（2026-10-11）
@@ -631,7 +636,7 @@ sequenceDiagram
   2. 把预制体加入 Addressables 并记地址；
   3. 在 `UIConfigAsset.asset` 的 `panels` 中登记（`panelKey`/`PrefabAddress`/`Layer`/`sceneTags`/`priority`/`isModal`…）；
   4. 调用 `IUIService.OpenAsync<T>()`。
-- **新增配置（零改动）**：① 实现 `GameConfigBase`（需要资产则用 `ConfigBySO<TSO>`）② 新建一个实现 `IConfigFactory` 的类放在 `Game` 程序集（公开无参构造）③ 若用资产，把资产加入 Addressables。启动时 `GameConfigRegistry` 自动完成「预热 → 注册 → 加载」，**无需改启动代码**（示例：`Game/Config/DemoTuningConfig.cs`、`Game/UI/Config/UIConfigFactory.cs`）。读取：`IGameConfigService.TryGet<T>(out var cfg)`。
+- **新增配置（零改动）**：① 实现 `GameConfigBase`（需要资产则用 `ConfigBySO<TSO>`）② 新建一个实现 `IConfigFactory` 的类放在 `Game` 程序集（公开无参构造）③ 若用资产，把资产加入 Addressables。启动时 `GameConfigRegistry` 自动完成「预热 → 注册 → 加载」，**无需改启动代码**（示例：`Game/Config/DemoTuningConfig.cs`、`Game/RPG/UI/Config/UIConfigFactory.cs`）。读取：`IGameConfigService.TryGet<T>(out var cfg)`。
 - **新增/修改配置项顺序**：`GameConfigBase(configId, loadOrder)` 的 `loadOrder` 决定 `LoadAll` 顺序（升序）。UI 缩放：把 `UISettings` 的 `ReferenceResolution`/`MatchWidthOrHeight` 写成业务配置驱动即可（样例见 `UIPanelSetupStep`）。
 - **新增加载步骤（启动 / 场景预加载，2026-10-12）**：实现 `ILoadStep` 后，再写一个实现 `IStartupLoadStepProvider` / `ISceneLoadStepProvider` 的类（公开无参构造）放在 `Game` 程序集即可，**不用改引导代码**；默认管线与扩展点见 §5.11。
 - **改引导流程 / 入口场景**：入口与 Loading 场景名 → 实现 `IBootstrapOptionsProvider`；要改流程本身 → 继承 `BootstrapRunner` 覆写钩子（框架会自动发现，只能有一个）。
@@ -661,7 +666,7 @@ sequenceDiagram
 
 > 面向「新工程从零接入」的分步指南见根目录 **`README.md`**；本节是两个工作流的实测记录。
 
-> 用一个真实的新面板（`Game/UI/DemoPanel.cs`）实测「按框架接入」的成本。结论：**新增服务与新增面板均无需改动框架代码**。
+> 用一个真实的新面板（`Game/RPG/UI/DemoPanel.cs`）实测「按框架接入」的成本。结论：**新增服务与新增面板均无需改动框架代码**。
 
 | 工作流 | 实际步骤 | 是否需改框架 | 实测结果 |
 |---|---|---|---|
@@ -676,7 +681,7 @@ sequenceDiagram
 4. **面板必须实现 `IUIPanelLifecycle`**：虽然已改 `public`，但使用者需知道「继承 `UIPanelBase`」这条约定（已在 §11 手册说明）。
 
 ### 复现方式（可重复）
-1. 新建 `Assets/Scripts/Game/UI/DemoPanel.cs`（见上）；
+1. 新建 `Assets/Scripts/Game/RPG/UI/DemoPanel.cs`（见上）；
 2. 建同名预制体（挂 `DemoPanel`，可选一个 `TMP_Text` 作为 `_title`），加入 Addressables（地址如 `UI/DemoPanel`）；
 3. 新建 `UIPanelConfigSO` 资产填入 `panelKey=DemoPanel` / `PrefabAddress=UI/DemoPanel` / `Layer=Popup`，加入 `UIConfigAsset.panels`；
 4. Play → 看日志 `已注册 UI 面板：N 个` → `IUIService.OpenAsync<DemoPanel>()`。

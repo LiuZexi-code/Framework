@@ -60,6 +60,10 @@ namespace Framework.Bootstrap
             try { _root?.Dispose(); }
             catch (Exception e) { Debug.LogError($"[GameRoot] Root dispose failed: {e}"); }
             _root = null;
+
+            // 静态引用复位：关闭域重载时它不会自动清零（已销毁对象虽是「伪 null」，
+            // 但显式置空才能让「当前无 GameRoot」这一事实可判定）
+            if (_instance == this) _instance = null;
         }
     }
 }

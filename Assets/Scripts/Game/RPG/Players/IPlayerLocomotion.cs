@@ -20,6 +20,12 @@ namespace Game.RPG.Players
         /// <summary>移动到世界坐标；返回 false 表示不可达。</summary>
         bool TryMoveTo(Vector3 worldPoint);
 
+        /// <summary>
+        /// 该世界点是否「走得到」（**只做 NavMesh 采样，不移动**）。
+        /// <para>光标用它在悬停阶段就提示「不可达」，避免玩家点了才发现走不过去。</para>
+        /// </summary>
+        bool IsReachable(Vector3 worldPoint);
+
         /// <summary>停止移动（不改变位置）。</summary>
         void Stop();
 

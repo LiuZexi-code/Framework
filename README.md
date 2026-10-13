@@ -1,46 +1,97 @@
-# MyFramework · Unity 游戏框架（5 分钟接入）
+# MyFramework · Unity 游戏框架
 
-> **一句话**：分层 + DI + 模块化的 Unity 框架 —— 新做一个游戏 demo 只需要**加文件**，不需要改框架或启动代码。
+> 分层 + DI + 模块化的 Unity 框架 —— 新做一个游戏 demo 只需要**加文件**，不需要改框架或启动代码。
 
 | 项 | 说明 |
 |---|---|
 | 引擎 | Unity 2022.3 LTS（URP / Addressables / Input System / TextMeshPro） |
 | 分层 | `Core`（无引擎依赖）→ `Abstractions`（纯接口）→ `Adapters`（Unity 实现）→ `Bootstrap`（启动/场景流）→ `Game`（业务） |
 | 扩展方式 | 反射自动发现 `IServiceModule` / `IConfigFactory` / `ILoadStepProvider` / `BootstrapRunner`，**新增功能零改框架代码** |
-| 质量 | 30 例 EditMode 测试全绿；控制台启动无异常/无警告 |
+| 质量 | 编译零警告；**167 例 EditMode + 10 例 PlayMode** 自动化测试全绿；启动/切场景控制台无异常无警告 |
 
 ---
 
-## 0. 先跑起来（3 步）
+## 📚 文档索引
+
+| 文档 | 内容 |
+|---|---|
+| **`README.md`（本文）** | 5 分钟接入指南 + 项目概览与进度 |
+| [`PROJECT_GUIDE.md`](./PROJECT_GUIDE.md) | 完整工程文档：架构、文件地图、问题清单、命名约定、接入成本实测 |
+| [`SCENE_CONFIG_DESIGN.md`](./SCENE_CONFIG_DESIGN.md) | 场景配置化设计稿与实施记录 |
+| [`UI_POPUP_DESIGN.md`](./UI_POPUP_DESIGN.md) | UI 弹窗系统设计稿（全局栈 / 模态 / 串行队列 / 超时） |
+| [`INPUT_DESIGN.md`](./INPUT_DESIGN.md) | 输入服务设计与实测记录 |
+| [`RPG_DEMO_DESIGN.md`](./RPG_DEMO_DESIGN.md) | 3D RPG Demo 需求规格 + 详细设计 + 分阶段计划与进度 |
+| [`docs/STARTUP_LOG.md`](./docs/STARTUP_LOG.md) | 启动自检：预期日志与判据 |
+| [`docs/FONTS.md`](./docs/FONTS.md) | 中文字体需自备（本仓库不含商业字体） |
+| [`docs/PITFALLS.md`](./docs/PITFALLS.md) | 实战踩坑清单（29 条，按主题分类） |
+
+---
+
+## ✨ 特性
+
+- **零改框架扩展**：新增服务 / 配置 / 加载步骤 / UI 面板 / 场景，只需**加文件** —— 框架反射发现并自动接线。
+- **自研轻量 DI 容器**：构造函数注入、单例/工厂注册、递归解析、循环依赖检测与明确报错；`ServiceLocator` 提供静态入口。
+- **模块化**：`IGlobalServiceModule` + `ISceneServiceModule`；每个场景一个**独立子容器**，场景卸载即释放其中的 `IDisposable` 服务。
+- **零挂载启动**：`FrameworkStartEntry` 在 `BeforeSceneLoad` 自动建常驻根节点，按「模块扫描 → 日志 → 加载管线 → SceneFlow → 入口场景」装配，业务不用写启动代码。
+- **统一加载管线**：启动阶段与「进入场景前的预加载」共用同一套 `ILoadStep` / `ILoadContext`（可上报进度、单步异常不中断管线）。
+- **配置驱动的 UI 系统**：分层 Canvas（Background…Overlay）+ 层内 `priority` 排序、面板缓存、场景标签、异步打开；**弹窗栈**支持模态遮罩、优先级、串行队列与超时取消；**UI 打开自动阻断玩法输入**（输入上下文，无需手写代码）。
+- **配置驱动的场景流**：`SceneCatalog` 描述场景（加载地址 / 是否常驻 / 专属预加载 / 标签），**4 种切换策略**（`SingleDirect` / `ThroughLoadingScene` / `Additive` / `AdditiveUnloadFirst`）一个旋钮切换；过渡期自动静音旧场景 `AudioListener`、关闭旧场景灯光，避免「双监听器 / 瞬间偏亮」。
+- **基础服务齐全**：日志、事件总线、资源（Addressables）、存储、配置、场景、UI、输入、音频（总线音量 / 淡入淡出 / Duck / 池化）。
+- **输入服务**：上下文栈（UI 阻断玩法）、动作查询与事件、可替换后端（Input System / Null / Mock），框架**不含任何操作语义**。
+- **编辑器生产力工具**：场景配置一键同步与校验、场景名下拉、RPG 场景装配器、程序化光标图标生成。
+- **质量基线**：编译零警告；167 例 EditMode + 10 例 PlayMode 自动化测试；业务层零 Addressables 依赖。
+
+---
+
+## 📈 项目进度
+
+### 框架
+
+| 里程碑 | 状态 | 说明 |
+|---|---|---|
+| M1 最小可运行 | ✅ | 启动链路端到端跑通、`SwitchScene` 可用 |
+| M2 UI 链路 | ✅ | 配置驱动注册 → 异步加载 → 开关/缓存/分层 + Loading 面板 |
+| M3 框架达标 | ✅ | 模块化 / 分层收口 / 命名规范 / 质量基线 |
+| M4 Demo 验证 | ✅ | 新增面板 4 步接入**零改框架**实测 |
+| P0–P9 收尾打磨 | ✅ | 弹窗系统、输入服务、场景配置化、切换策略收敛、音频服务、测试补齐 |
+
+「完成」的定义（DoD D1–D8：启动全通 / 基础服务齐全 / UI 全链路 / 场景流 / 模块化 / 分层干净 / 质量 / 文档）**已全部达成**，详见 [`PROJECT_GUIDE.md`](./PROJECT_GUIDE.md) §1.5。
+
+### 示例游戏 · 3D RPG Demo
+
+| 阶段 | 状态 |
+|---|---|
+| D 音频服务（框架级新增） | ✅ 完成 |
+| A1 输入重绑 | ✅ 完成 |
+| A2 Layer + `RPGScene` 关卡（NavMesh 烘焙） | ✅ 完成 |
+| A3 Cinemachine 环绕相机（A/D + 滚轮缩放） | ✅ 完成 |
+| A4 点击移动（`PlayerMotor` + 落点标记） | ✅ 完成 |
+| A5 交互系统（拾取 / 对话 / 攻击 + 场景装配工具） | ✅ 完成 |
+| A6 软件光标（6 状态，策略模式） | ✅ 完成 |
+| A7 HUD 交互按钮 | ⬜ 待做 |
+| I 物品·容器·装备 / B 战斗 / S 存档 / C 任务·对话 | ⬜ 未开始 |
+
+> 完整需求、设计与阶段 DoD 见 [`RPG_DEMO_DESIGN.md`](./RPG_DEMO_DESIGN.md)（进度对照见其 §18）。
+
+### 质量基线
+
+- 编译**零警告**；启动 / 切场景 / 交互链路控制台**零错误零警告**。
+- **167 例 EditMode**（`Assets/Scripts/Tests`）+ **10 例 PlayMode**（`Tests.PlayMode`，含只能在 Play 复现的输入后端回归）。
+- 依赖方向单向不可逆；业务层不直接依赖 Addressables。
+
+---
+
+## 🚀 快速开始（3 步）
 
 1. 用 Unity **2022.3** 打开本工程；
 2. 打开 `Assets/Scenes/SampleScene.unity`；
 3. 按 **Play**（不用挂任何脚本 —— `FrameworkStartEntry` 会自动装配整个框架）。
 
-**自检用的预期日志**：
+**自检**：启动日志应以 `启动完成` 结尾，且控制台无异常/无警告 —— 预期日志与判据见 [`docs/STARTUP_LOG.md`](./docs/STARTUP_LOG.md)。
 
-```text
-框架启动中...
-[Bootstrap] 使用框架默认引导流程
-[Modules] 扫描完成：全局模块 2 个，场景模块 1 个
-[Modules] 已注册全局模块 CoreServiceModule（Order=-1000）
-[Modules] 已注册全局模块 DemoGlobalModule（Order=100）
-[Config] 发现配置 2 个：UIConfig(order=-100), DemoTuning(order=0)
-[Bootstrap] 预热配置…
-[Bootstrap] 加载配置…
-[Bootstrap] 注册 UI 面板…
-UI 配置已应用：参考分辨率 1920×1080，MatchWidthOrHeight=0.5
-[UI] UIRoot 缩放：参考分辨率 1920×1080，MatchWidthOrHeight=0.5（0→按宽，1→按高）
-已注册 UI 面板：2 个
-加载 Loading 场景：LoadingScene
-隐藏 Loading 场景
-Loading 场景就绪（常驻，默认隐藏）
-场景容器建立：SampleScene
-启动完成
-```
+**⚠️ 中文字体需自备**：本仓库不含商业中文字体，克隆后 TMP 中文会提示 missing reference —— 处理方式见 [`docs/FONTS.md`](./docs/FONTS.md)。
 
-> 若从其它场景（例如 `LoadingScene`）运行，会看到真实切换流程，并额外出现
-> `开始切换：<none> → SampleScene` / `显示 Loading 场景` / `[Load] 预加载面板：N 个（…）` / `切换完成：SampleScene`。
+**（可选）验证场景切换**：运行模式下用菜单 `Tools/我的工具/场景切换/…` 在 `SampleScene` ↔ `Level2` 之间双向切换，观察加载日志（`开始切换` → `切换完成`）。
 
 ---
 
@@ -414,7 +465,7 @@ input.PopContext(GameActions.Contexts.UI);                                      
 - 空栈 = **不限制**（不用上下文的项目行为不变）；同名重复 Push 会**计数**，需等次数 Pop。
 - **UI 面板会自动阻断**：在面板配置里填 `inputContextId = UI`（本项目 `DemoPanel` 已填）→ 打开自动 Push、关闭/被场景销毁自动 Pop，玩法输入相应被阻断/恢复，**不用手写代码**。
 - 换后端：再写一个 `IGlobalServiceModule`，`Order > 10`，`registry.Register<IInputBackend>(new XxxBackend())` 即可（后注册者覆盖）。
-- 演示：`Game.Inputs.InputDemo`（**事件驱动，不依赖 Update**）。按 `Escape` 切入/切出 UI 上下文。
+- 演示：见 `Game/RPG/` —— `InteractionDriver` 逐帧查询 `Click` / `Interact` 动作；UI 面板填 `inputContextId` 后打开自动阻断玩法输入。
 
 完整设计、接口与实测记录见 [`INPUT_DESIGN.md`](./INPUT_DESIGN.md)。
 
@@ -442,31 +493,38 @@ input.PopContext(GameActions.Contexts.UI);                                      
 
 ## 4. 目录与分层
 
+```mermaid
+graph LR
+    Core["Framework/Core<br/>noEngineReferences"] --> Abs["Framework/Abstractions<br/>纯接口与数据契约"]
+    Abs --> Adp["Framework/Adapters<br/>Unity 实现"]
+    Adp --> Bs["Framework/Bootstrap<br/>启动 / 场景流"]
+    Bs --> Game["Game<br/>业务层 / RPG Demo"]
+```
+
 ```text
 Assets/Scripts/
 ├── Framework/
 │   ├── Core/           # 无引擎依赖内核：DI 容器 / 服务定位 / 描述符
 │   ├── Abstractions/   # 纯接口与数据契约
-│   │   ├── Assets/ Events/ GameConfig/ Loading/ Logging/ Modules/ Scenes/ Storage/ UI/
+│   │   ├── Assets/ Audio/ Events/ GameConfig/ Input/ Loading/
+│   │   │   Logging/ Modules/ Scenes/ Storage/ UI/
 │   │   └── Loading/    # ILoadStep / ILoadContext / ILoadStepProvider / LoadPipeline + 内置步骤
-│   ├── Adapters/       # Unity 实现（Addressables / 场景 / 存储 / UI / 日志）+ CoreServiceModule
+│   ├── Adapters/       # Unity 实现（Addressables / 场景 / 存储 / UI / 日志 / 输入 / 音频）+ CoreServiceModule
 │   └── Bootstrap/      # FrameworkStartEntry / GameRoot / BootstrapRunner / SceneFlow
 │                       # + 自动发现：ServiceModuleRegistry / GameConfigRegistry / LoadStepCollector
-├── Game/               # 业务层（示例，只有“提供者”类）
-│   ├── Bootstrap/GameBootstrapOptions.cs    # 引导参数（场景名已交给配置，此处留空）
-│   ├── Bootstrap/UIPanelSetupStep.cs        # 启动步骤：应用 UI 配置 + 注册面板
-│   ├── Bootstrap/SceneCatalogSetupStep.cs   # 启动步骤：场景配置 → ISceneCatalog + 校验
-│   ├── Scenes/Config/                       # 场景配置（SceneConfigSO / SceneConfigAssetSO / Factory / Validation）
-│   ├── Editor/                              # 编辑器工具（Game-Editor）：同步登记 + 场景下拉 + 校验按钮
-│   ├── Modules/DemoGlobalModule.cs          # 示例：全局 + 场景级服务
-│   ├── Modules/GameSceneServiceModule.cs    # 示例：把场景服务切为 Addressables 版
-│   ├── Inputs/                              # 输入：GameActions / GameInputModule / 输入资产 / 接入步骤 / InputDemo
-│   ├── Config/DemoTuningConfig.cs           # 示例：纯代码配置 + IConfigFactory
-│   └── UI/                                  # 面板（LoadingPanel / DemoPanel）+ UIConfigAsset
-├── Fonts/              # 中文字体（方正小标宋简.TTF + 生成的 CNFont SDF.asset）
+├── Game/               # 业务层（框架示例 + RPG demo）
+│   ├── Bootstrap/      # 引导参数 + 启动步骤（应用 UI 配置 / 场景目录→ISceneCatalog）
+│   ├── Scenes/Config/  # 场景配置（SceneConfigSO / SceneConfigAssetSO / Factory / Validation）
+│   ├── Editor/         # 编辑器工具（Game-Editor）：同步登记 + 场景下拉 + 校验 + 光标图标生成
+│   ├── Modules/        # 示例模块：全局/场景服务、切换场景服务为 Addressables 版
+│   ├── Inputs/         # 输入：GameActions / GameInputModule / inputactions 资产 / 接入步骤
+│   ├── Config/         # 示例：纯代码配置 + IConfigFactory
+│   ├── UI/             # 面板（LoadingPanel / DemoPanel）+ UIConfigAsset
+│   └── RPG/            # RPG Demo：Cameras / Players / Interaction / Cursors / Data
+├── Fonts/              # 中文字体（⚠️ 本地自备、不入库，见 docs/FONTS.md）
 ├── UI/Tools/           # LoadingDots / ProgressBar 小工具（命名空间 Game.UI.Tools）
-└── Tests/              # EditMode 测试（127 例）
-    └── PlayMode/       # PlayMode 测试（3 例，程序集 Tests.PlayMode）
+└── Tests/              # EditMode 测试（167 例）
+    └── PlayMode/       # PlayMode 测试（10 例，程序集 Tests.PlayMode）
 ```
 
 **依赖方向（不可逆）**：`Core` ← `Abstractions` ← `Adapters` ← `Bootstrap` ← `Game`。
@@ -476,44 +534,13 @@ Assets/Scripts/
 
 ## 5. 实战踩坑清单
 
-1. **场景必须加入 Build Settings**，否则 `LoadAsync` 抛异常。
-2. **业务场景不要再自带 `EventSystem`** —— 框架会自动创建常驻的；两个会报 `There can be only one active Event System`。
-3. 程序集名必须满足 1.3 的前缀规则，否则模块/配置**扫不到**（且不会有报错，只会静默少注册）。
-4. 模块类 / `IConfigFactory` 需要**公开无参构造函数**。
-5. 面板脚本必须实现 `IUIPanelLifecycle`（推荐继承 `UIPanelBase`），否则 `UIService` 会报「未实现 IUIPanelLifecycle」。
-6. `UIRoot` 是**懒创建**的（首次实例化面板时），且位于 `DontDestroyOnLoad` 场景 → 场景层级面板/搜索工具**看不到它**，排查请用日志。
-7. 需要「跨场景常驻」的面板，把配置里的 `sceneTags` **留空**（空 = 全局，切场景不清理）；
-   填了 `sceneTags` 的面板只在那些场景存活，由 `SceneResourceRelease → DisposeScenePanels(enteringScene)` 自动清理。
-   ⚠️ 传入的是**进入的场景**（不是 `ActiveSceneName` —— 切换中它还是旧场景）。
-8. 首次 Addressables 加载前框架已做预热，避免同步 `WaitForCompletion` 与初始化互锁；**新增配置请走 `IConfigFactory`**（会被一并预热），不要自己在别处同步加载。
-9. `LoadingScene` 作为**常驻叠加层**使用时必须是纯 UI（**不要放 Camera / Directional Light**，也不需要 EventSystem）；框架会在加载完成后把它整体 `SetActive(false)`，只在切换期间显示。
-10. 用 MCP/自动化驱动 Play 验证时，编辑器失焦会暂停播放循环（`Application.runInBackground` 默认 `false`）→ 先置 `true`，否则看到的是「启动卡死」假象。
-11. Play 模式下不能用 `EditorSceneManager` 打开场景（自动化工具的 `manage_scene load` 会报错）。
-12. `Log.Init(null)` 会被忽略（不会覆盖已有实现）；`Log.Clear()` 会复位以便重新注入。
-13. **入口场景已经是当前场景时不会触发场景预加载**（走「复用」快路径）。想验证预加载，从其它场景（如 `LoadingScene`）运行，或调用 `SwitchScene`。
-14. `IBootstrapRunner` **最多只能有一个**自定义实现；多个会报错并只用其中一个。
-15. 加载步骤提供者 / 引导参数提供者都需要**公开无参构造函数**。
-16. **中文字体已接入**：`Assets/Fonts/CNFont SDF.asset`（由 `方正小标宋简.TTF` 生成的 **Dynamic** TMP 字体，按需生成字形）已加入 `LiberationSans SDF` 的**回退字体表** → 用默认字体的 TMP 文本都能直接显示中文。若你换了默认字体，记得同样挂回退表。
-17. **面板 `sceneTags` 不匹配会直接拒绝打开**（返回 null 并告警）：`DemoPanel` 若只在 `SampleScene` 下能开，换个场景打开就是“叫了没反应”。改配置或关掉 `UISettings.EnforceSceneTags`（见 2.8）。
-18. **启动未完成时调 `SwitchScene` 会被拒**（告警“启动尚未完成”）：等启动日志出现 `启动完成` 后再调。
-19. 用 MCP/自动化读控制台时，`read_console` 的 `count` 是「从缓冲区头部取 N 条」，且可能拿到**较早的快照** → 验证一条切换是否走完，**先 `clear` 再触发再读**最可靠（否则会误以为日志缺失）。
-20. **从「非入口场景」按 Play 时，框架会把入口场景加载进来、并卸载你这个初始场景**（这是正确行为，否则它会带着自己的相机/灯光/AudioListener 常驻）。想在那个场景里调试，就把它设为入口场景（`GameBootstrapOptions.EntrySceneName`）。判据：启动日志应为 `开始切换：<初始场景> → <入口场景>`；若显示 `开始切换：<none> → …`，说明旧场景没有被识别（旧版本缺陷）。
-21. **切换后光照变了不一定是 bug**：`RenderSettings`（环境光/天空盒/雾）和 Light 都是**场景自带数据**，切过去就用目标场景的配置。请在两个场景里把灯光参数对齐（本工程的 `Level2` 是新建场景默认的 `intensity=1`/暖白，而 `SampleScene` 是 `2`/纯白）。框架只负责**过渡期不叠加**（日志：`关闭旧场景灯光：…`），不负责统一各场景的光照。
-22. 🔴 **Build Settings 与 Addressables 对场景是互斥的**：场景一旦标记为 Addressable，Unity 会**自动把它在 Build Settings 里禁用**（`enabled=false` + 控制台警告）。所以不要指望「两处都登记、两条路都能跑」—— 本工程走 Addressables（`AddressablesSceneService`），Build Settings 里 3 个场景全是 `enabled=false`。配置里用 `registration` 字段声明走哪条路，同步工具只会写一条。
-23. **场景配置是可选的**：没建 `SceneCatalog.asset` 时一切照旧（所有场景按「Additive / 不常驻 / 显示 Loading」处理）。想从旧行为迁移，就先把现有场景登记进去、再逐步加 `preloadAddresses` 等字段。
-24. **`GetAxis` 读 `Vector2` 动作会抛异常**（`Cannot read value of type 'Single' from composite ...`）—— 框架已在 `InputSystemBackend` 内部按 `activeValueType` 选通道修好。⚠️ 这个错误**只在 Play 下复现**：EditMode 里动作未绑设备时 `activeValueType` 为 `null`、读取直接返回 0，所以单测覆盖不到（已用「类型路由判据」单测兜底）。
-25. **模拟输入只能在 Play 下生效**：`InputSystem.QueueStateEvent` 需配合 `InputSystem.settings.updateMode = ProcessEventsManually` + `InputSystem.Update()` 才能在不依赖真实按键的情况下注入输入（原生后端会与模拟事件相互覆盖，导致设备态读回 0）。
-26. **`UnityEngine.ILogger` 与框架 `ILogger` 同名**：在同时 `using UnityEngine;` 的文件里要用别名 `using ILogger = Framework.Abstractions.Logging.ILogger;`（输入模块踩过一次）。
-27. **命名空间不要叫 `Game.Input`**：会与 `UnityEngine.Input` 在类型解析上打架；本项目用 `Game.Inputs`。
-28. **`GamepadButton` 是顺序枚举不是位标志**（`South == 6`）→ 造合成手柄状态必须用 `GamepadState.WithButton(...)`；直接写 `buttons = (ushort)GamepadButton.South` 会按错键（我在 PlayMode 测试里就这么错过一次）。对比 `MouseState.buttons` 才是位域（`1` = 左键）。
-29. **手写/模拟输入要在 Play 下才有效**：需 `InputSystem.settings.updateMode = ProcessEventsManually` + `QueueStateEvent` + `InputSystem.Update()`；默认动态更新模式下模拟事件不会作用到 `ReadValue`。合成手柄比键盘可靠。
+> 29 条实战经验已拆分到 **[`docs/PITFALLS.md`](./docs/PITFALLS.md)**（按主题分类：场景与切换 / UI 与面板 / 资源与配置 / 程序集与模块化 / 输入服务 / 自动化验证）。
 
 ---
 
 ## 6. 更多
 
-- **完整工程文档**（架构、文件地图、问题清单、进度、命名约定）：[`PROJECT_GUIDE.md`](./PROJECT_GUIDE.md)
-- **场景配置化设计与实施记录**：[`SCENE_CONFIG_DESIGN.md`](./SCENE_CONFIG_DESIGN.md)
-- **输入服务设计与实测记录**：[`INPUT_DESIGN.md`](./INPUT_DESIGN.md)
-- **跑测试**：Test Runner → **EditMode 127 例**（全绿）+ **PlayMode 3 例**（`Tests.PlayMode`，输入后端的真实回归；含那个只能在 Play 复现的 `activeValueType` bug）
-- **接入成本实测**：见 `PROJECT_GUIDE.md` §12（新增服务 / 面板 / 配置三条路径的实测记录）
+- **跑测试**：Test Runner → **EditMode 167 例** + **PlayMode 10 例**（`Tests.PlayMode` 用合成手柄 + `ProcessEventsManually` 注入真实输入，覆盖那个只能在 Play 复现的 `activeValueType` bug）。
+- **接入成本实测**：见 `PROJECT_GUIDE.md` §12（新增服务 / 面板 / 配置三条路径的实测记录）。
+- **文档索引**：见文首 [📚 文档索引](#-文档索引)。
+

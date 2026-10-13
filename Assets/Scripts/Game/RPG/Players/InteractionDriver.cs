@@ -107,12 +107,22 @@ namespace Game.RPG.Players
             var interactable = hit.collider.GetComponentInParent<Interactable>();
             if (interactable != null)
             {
-                _interaction.SetHover(new HoverInfo(interactable.Kind, interactable.DisplayName, interactable, hit.point, true));
+                // 可达性用目标的**站位点**判定（与 OrderInteraction 交出的点是同一个），
+                // 而 HoverInfo.Point 仍是鼠标实际命中的位置（供落点特效等使用）。
+                var aim = interactable.ApproachPosition;
+                _interaction.SetHover(new HoverInfo(interactable.Kind, interactable.DisplayName, interactable, hit.point, IsReachable(aim)));
                 return;
             }
 
-            _interaction.SetHover(new HoverInfo(InteractionKind.Ground, null, null, hit.point, true));
+            _interaction.SetHover(new HoverInfo(InteractionKind.Ground, null, null, hit.point, IsReachable(hit.point)));
         }
+
+        /// <summary>
+        /// 该世界点能否走到（驱动不可达时 → 光标显示 <c>Unreachable</c>）。
+        /// <para>玩家实现尚未就绪时**保守视为可达**，避免开局把一切目标都误报成不可达。</para>
+        /// </summary>
+        private bool IsReachable(Vector3 worldPoint)
+            => motor == null || motor.IsReachable(worldPoint);
 
         private void Awake()
         {

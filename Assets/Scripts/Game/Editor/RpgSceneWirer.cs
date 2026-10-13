@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Game.RPG.Cursors;
 using Game.RPG.Interaction;
 using Game.RPG.Players;
 using UnityEditor;
@@ -8,7 +9,7 @@ using UnityEngine;
 namespace Game.EditorTools
 {
     /// <summary>
-    /// RPG 场景装配工具：把交互组件挂到场景物体上（幂等，可重复执行）。
+    /// RPG 场景装配工具：把**交互组件**与**软件光标**挂到场景上（幂等，可重复执行）。
     /// <para>
     /// 之所以做成菜单：某些会话里 AI 侧的 <c>execute_code</c> 工具可能不可用，
     /// 而「给场景物体挂组件」是必须碰编辑器的活。做成一个菜单项后，
@@ -60,6 +61,68 @@ namespace Game.EditorTools
             Debug.Log($"[RpgSceneWirer] 交互组件装配完成（{report.Count} 项）：" + string.Join("；", report));
         }
 
+        [MenuItem(MenuRoot + "装配软件光标到当前场景")]
+        private static void WireCursor()
+        {
+            var scene = EditorSceneManager.GetActiveScene();
+            if (!scene.IsValid())
+            {
+                Debug.LogError("[RpgSceneWirer] 当前没有有效场景，已中止");
+                return;
+            }
+
+            // 与交互组件同一道安全门：只在「有玩家」的场景动手，避免误改 SampleScene / Level2
+            var player = GameObject.Find("Player");
+            if (player == null || player.GetComponent<PlayerMotor>() == null)
+            {
+                Debug.LogError($"[RpgSceneWirer] 当前场景（{scene.name}）里找不到挂着 PlayerMotor 的 Player —— " +
+                               "请先打开 RPGScene。已中止，避免误改其它场景。");
+                return;
+            }
+
+            var settings = AssetDatabase.LoadAssetAtPath<RpgCursorSettingsSO>(RpgCursorIconGenerator.SettingsPath);
+            if (settings == null)
+            {
+                Debug.LogError($"[RpgSceneWirer] 找不到软件光标设置资产「{RpgCursorIconGenerator.SettingsPath}」——" +
+                               "请先执行菜单 Tools/我的工具/RPG/生成软件光标图标。已中止。");
+                return;
+            }
+
+            var report = new List<string>();
+
+            var go = GameObject.Find(CursorObjectName);
+            if (go == null)
+            {
+                go = new GameObject(CursorObjectName);
+                report.Add("新建物体");
+            }
+
+            var existing = go.GetComponent<CursorView>();
+            var view = existing != null ? existing : go.AddComponent<CursorView>();
+            report.Add(existing != null ? "组件已存在" : "新增 CursorView");
+
+            var so = new SerializedObject(view);
+            var settingsProperty = so.FindProperty("settings");
+            if (settingsProperty == null)
+                report.Add($"‼ 未找到序列化字段「settings」（{nameof(CursorView)} 字段名改了？）");
+            else if (settingsProperty.objectReferenceValue == null)
+            {
+                settingsProperty.objectReferenceValue = settings;
+                report.Add("已指派设置资产");
+            }
+            else report.Add("设置资产已指派");
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+
+            Debug.Log($"[RpgSceneWirer] 软件光标装配完成：{CursorObjectName}（{string.Join("；", report)}）");
+        }
+
+        /// <summary>软件光标在场景里的物体名（运行期的 UI 根另叫 <c>[CursorUI]</c>）。</summary>
+        private const string CursorObjectName = "CursorView";
+
         [MenuItem(MenuRoot + "检查交互组件是否齐全")]
         private static void CheckInteraction()
         {
@@ -73,6 +136,17 @@ namespace Game.EditorTools
 
                 var interactable = go.GetComponent<Interactable>();
                 lines.Add($"{names[i]}={(interactable != null ? interactable.Kind + "/" + interactable.DisplayName + "/" + interactable.InteractionRange : "未挂")}");
+            }
+
+            var cursorGo = GameObject.Find(CursorObjectName);
+            var cursorView = cursorGo != null ? cursorGo.GetComponent<CursorView>() : null;
+            if (cursorView == null) lines.Add($"{CursorObjectName}=未装配");
+            else
+            {
+                var so = new SerializedObject(cursorView);
+                var settingsProperty = so.FindProperty("settings");
+                var assigned = settingsProperty != null && settingsProperty.objectReferenceValue != null;
+                lines.Add($"{CursorObjectName}=已装配（设置资产={assigned}）");
             }
 
             Debug.Log("[RpgSceneWirer] 检查结果：" + string.Join("；", lines));

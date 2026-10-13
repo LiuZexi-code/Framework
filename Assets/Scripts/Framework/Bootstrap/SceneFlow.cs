@@ -886,6 +886,10 @@ namespace Framework.Bootstrap
                 try { _scenes[i].Container.Dispose(); } catch { }
             }
             _scenes.Clear();
+
+            // 与 SetCurrent 的 ServiceLocator.Set 对称：容器已释放，不能再让别人解析到已销毁的服务。
+            // （关闭域重载时它是静态字段，且不会随 Play 退出自动清零 → 下一局启动早期会解析到上一局的服务）
+            ServiceLocator.Clear();
         }
     }
 }
